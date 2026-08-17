@@ -12,6 +12,7 @@ In Progress
 - Endpoints protected by a JWT filter (Spring Security); missing/invalid token → 401
 - Clear errors for: duplicate email, wrong email/password, invalid input
 - Auto-create a default `Pet` for the user immediately after successful registration (unblocks Pet feature)
+- Swagger UI configured so register/login/me can be manually tried without a separate HTTP client, with realistic example values pre-filled in the request body
 
 ## Endpoints
 
@@ -54,6 +55,15 @@ In Progress
   | Invalid input (validation) | 400 | `VALIDATION_ERROR` |
   | Missing/expired/invalid token | 401 | `UNAUTHORIZED` |
 - **Open question for FE**: confirm `Authorization: Bearer` header (spec's default) vs httpOnly cookie before coding `AuthController` — cookie may be preferred if FE wants server-side token reads in Next.js SSR
+- Swagger/OpenAPI added (2026-08-18) so register/login/me can be manually tested:
+  - `pom.xml` — `springdoc-openapi-starter-webmvc-ui` 3.1.0 (3.x line targets Spring Boot 4 / Spring Framework 7; confirmed available on Maven Central, resolves and compiles clean against this project's Boot 4.1.0)
+  - `common/config/OpenApiConfig` — `OpenAPI` bean with a `bearerAuth` HTTP/JWT security scheme, so the Swagger UI "Authorize" button can be used to call the protected `/me` endpoint
+  - `SecurityConfig` — `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` made public (doc pages themselves don't need a token; the API calls made from within Swagger UI still go through the normal JWT filter)
+  - `RegisterRequest`/`LoginRequest` — `@Schema(example = ...)` on each field (`user@example.com` / `password123` / `beginner`) so the Swagger UI request body is pre-filled with valid sample data on "Try it out", not empty/zero values
+  - `AuthController` — `@Tag`/`@Operation` summaries added for readability in the Swagger UI endpoint list; `@SecurityRequirement(name = "bearerAuth")` on `/me` so Swagger UI shows the lock icon and requires a token
+  - Swagger UI will be at `/swagger-ui.html` once the app is running (default springdoc path, not customized)
+  - **Not yet verified in-browser**: `mvnw compile` passes and the app boots up to the same JPA/Hibernate step as before, but still fails at `entityManagerFactory` creation — no real Postgres connection available in this dev environment (same blocker as the `contextLoads` test, see above). To actually try register/login through Swagger UI, run the app against a real Postgres with `DB_URL`/`DB_USERNAME`/`DB_PASSWORD`/`JWT_SECRET` set, then open `http://localhost:8080/swagger-ui.html`
+  - No DB seed/sample rows added — "sample data" here means pre-filled example values in the Swagger request forms, not seeded database rows. Since `register` creates its own account, no seed data is needed to try the full register → login flow
 
 ## History
 

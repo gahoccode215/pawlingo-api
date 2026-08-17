@@ -1,4 +1,4 @@
-package com.pawlingo.api.user;
+package com.pawlingo.api.user.enums;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;

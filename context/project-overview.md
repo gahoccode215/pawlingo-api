@@ -40,7 +40,7 @@ Pin versions here as they're actually adopted, so this file stays the source of 
 | Auth (OAuth) | `spring-boot-starter-oauth2-client` | — | Not added — Google OAuth out of scope for now |
 | Validation | Jakarta Bean Validation / Hibernate Validator | 9.1.0.Final | In use |
 | Object mapping | Lombok | 1.18.46 | In use |
-| Docs | springdoc-openapi (Swagger UI) | — | Not added yet |
+| Docs | springdoc-openapi (Swagger UI) | 3.1.0 | In use — UI at `/swagger-ui.html`, JSON at `/v3/api-docs` |
 | Test | JUnit Jupiter / Mockito / AssertJ | 6.0.3 / 5.23.0 / 3.27.7 | In use |
 | Test | Testcontainers | — | Not added — needs Docker, not available in current dev environment |
 

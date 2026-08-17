@@ -1,5 +1,7 @@
-package com.pawlingo.api.user;
+package com.pawlingo.api.user.entity;
 
+import com.pawlingo.api.user.enums.AuthProvider;
+import com.pawlingo.api.user.enums.Goal;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

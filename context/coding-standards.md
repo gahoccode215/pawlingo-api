@@ -22,9 +22,13 @@ com.pawlingo.api
 │       ├── request/     (RegisterRequest, LoginRequest...)
 │       └── response/    (RegisterResponse, LoginResponse, MeResponse...)
 ├── user
-│   ├── repository/
-│   │   └── UserRepository.java
-│   └── User.java, Goal.java, AuthProvider.java (entities/enums live directly in the feature package, not under entity/, since user has no other layers yet)
+│   ├── entity/
+│   │   └── User.java
+│   ├── enums/
+│   │   ├── Goal.java          (also referenced directly by auth DTOs, not user-only)
+│   │   └── AuthProvider.java
+│   └── repository/
+│       └── UserRepository.java
 ├── pet
 ├── vocab
 ├── progress
@@ -40,7 +44,8 @@ com.pawlingo.api
 - `service/` holds the interface directly; the implementation lives in `service/impl/` as `*ServiceImpl` (e.g. `AuthService` + `AuthServiceImpl`). Controllers and other services depend on the interface type, never the impl, so Spring injects by interface and the impl stays swappable/mockable.
 - A service only needs this interface+impl split when it's a business service consumed elsewhere via its interface (e.g. `AuthService`). A narrow technical utility used by exactly one caller (e.g. `JwtService`, only used inside `auth`) can stay a concrete `@Service` class in `service/` without an interface — don't split it just for consistency.
 - `repository/` holds `*Repository` interfaces (`extends JpaRepository`).
-- Each feature package typically has: `controller/`, `service/` (+`service/impl/`), `repository/`, `entity/` (if needed), `dto/request/`, `dto/response/`.
+- `entity/` holds only `@Entity`-annotated classes. Enums go in a sibling `enums/` folder, not inside `entity/` — an enum is a shared domain value type (often referenced directly by DTOs across feature packages, e.g. `Goal` in `auth`'s request/response DTOs), not something owned exclusively by the entity.
+- Each feature package typically has: `controller/`, `service/` (+`service/impl/`), `repository/`, `entity/`, `enums/`, `dto/request/`, `dto/response/` — add only the ones a feature actually needs.
 
 ---
 

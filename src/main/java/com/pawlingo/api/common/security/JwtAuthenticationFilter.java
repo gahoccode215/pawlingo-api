@@ -1,7 +1,7 @@
 package com.pawlingo.api.common.security;
 
 import com.pawlingo.api.auth.service.JwtService;
-import com.pawlingo.api.user.User;
+import com.pawlingo.api.user.entity.User;
 import com.pawlingo.api.user.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

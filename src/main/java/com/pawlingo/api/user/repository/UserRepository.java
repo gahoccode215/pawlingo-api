@@ -1,6 +1,6 @@
 package com.pawlingo.api.user.repository;
 
-import com.pawlingo.api.user.User;
+import com.pawlingo.api.user.entity.User;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
