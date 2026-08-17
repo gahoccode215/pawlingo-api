@@ -2,7 +2,7 @@
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
@@ -12,6 +12,7 @@ Not Started
 - Endpoints protected by a JWT filter (Spring Security); missing/invalid token → 401
 - Clear errors for: duplicate email, wrong email/password, invalid input
 - Auto-create a default `Pet` for the user immediately after successful registration (unblocks Pet feature)
+- Swagger UI configured so register/login/me can be manually tried without a separate HTTP client, with realistic example values pre-filled in the request body
 
 ## Endpoints
 
@@ -23,6 +24,21 @@ Not Started
 
 ## Notes
 
+- Implemented so far (branch `feature/authentication-email-password-mvp`):
+  - `pom.xml` — added web, data-jpa, security, validation, postgresql, flyway-core (+flyway-database-postgresql), lombok, jjwt 0.12.6
+  - `application.yaml` — datasource/JWT secret/CORS origin all via env vars (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `JWT_EXPIRATION_SECONDS`, `CORS_ALLOWED_ORIGINS`), `ddl-auto: none`, Flyway enabled
+  - `src/main/resources/db/migration/V1__create_users_table.sql`
+  - `user` package: `User` entity, `Goal` enum (JSON value `beginner`/`test-prep`/`professional`/`for-child` via `@JsonValue`/`@JsonCreator`, DB stores enum name via `@Enumerated(STRING)`), `AuthProvider` enum, `user/repository/UserRepository`
+  - `common/response`: `ApiResponseDTO<T>` (renamed from `ApiResponse` to avoid a future clash with springdoc-openapi's own response type), `ErrorDetail`
+  - `common/exception`: `BusinessException` + `ErrorCode` enum (replaced per-error exception classes `DuplicateEmailException`/`InvalidCredentialsException` — new business errors are now a new `ErrorCode` constant, not a new file), `GlobalExceptionHandler` (409/401/400/500)
+  - `common/security`: `JwtAuthenticationFilter`, `JwtAuthenticationEntryPoint` (401 via envelope, reuses `ErrorCode.UNAUTHORIZED`, not Spring's default plain-text 401)
+  - `common/config/SecurityConfig`: stateless JWT, BCrypt bean, permits register/login, CORS from `app.cors.allowed-origins`
+  - `auth` package restructured by layer: `auth/controller/AuthController`, `auth/service/AuthService` (interface) + `auth/service/impl/AuthServiceImpl`, `auth/service/JwtService` (no interface — single implementation, only used inside `auth`), DTOs in `auth/dto/request/` (`RegisterRequest`, `LoginRequest`) and `auth/dto/response/` (`RegisterResponse`, `LoginResponse`, `MeResponse`)
+  - Pet auto-creation on register is a no-op with a TODO comment pointing at `auth-spec.md#data-model` (Pet entity doesn't exist yet — per spec, don't block auth merge on it)
+  - `AuthServiceImplTest` (`auth/service/impl`) — 5 Mockito unit tests against `AuthServiceImpl` (register success/duplicate, login success/wrong-password/unknown-email), all passing
+- Build note: Spring Boot 4.1.0 ships Jackson 3 (`tools.jackson.databind`, not `com.fasterxml.jackson.databind`) — `JwtAuthenticationEntryPoint` uses the `tools.jackson` import accordingly
+- `mvnw compile` and the 5 new unit tests pass. The pre-existing `PawlingoApiApplicationTests.contextLoads` smoke test now fails because it boots the full Spring context, which needs a live Postgres connection — no DB/Docker is provisioned in this dev environment yet. Not a code defect; needs either a local Postgres or Testcontainers+Docker once available.
+- `pawlingo-api` had no git repo before this feature — initialized one and made a baseline commit on `main` before branching
 - Spec: `context/features/auth-spec.md`
 - Google OAuth is explicitly out of scope for this pass (separate future feature) — don't let it block Pet/Vocab/Progress work
 - Also out of scope: refresh token/logout-all-devices, forgot/reset password via email, login rate limiting (should come soon after but not blocking MVP)
@@ -39,6 +55,15 @@ Not Started
   | Invalid input (validation) | 400 | `VALIDATION_ERROR` |
   | Missing/expired/invalid token | 401 | `UNAUTHORIZED` |
 - **Open question for FE**: confirm `Authorization: Bearer` header (spec's default) vs httpOnly cookie before coding `AuthController` — cookie may be preferred if FE wants server-side token reads in Next.js SSR
+- Swagger/OpenAPI added (2026-08-18) so register/login/me can be manually tested:
+  - `pom.xml` — `springdoc-openapi-starter-webmvc-ui` 3.1.0 (3.x line targets Spring Boot 4 / Spring Framework 7; confirmed available on Maven Central, resolves and compiles clean against this project's Boot 4.1.0)
+  - `common/config/OpenApiConfig` — `OpenAPI` bean with a `bearerAuth` HTTP/JWT security scheme, so the Swagger UI "Authorize" button can be used to call the protected `/me` endpoint
+  - `SecurityConfig` — `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html` made public (doc pages themselves don't need a token; the API calls made from within Swagger UI still go through the normal JWT filter)
+  - `RegisterRequest`/`LoginRequest` — `@Schema(example = ...)` on each field (`user@example.com` / `password123` / `beginner`) so the Swagger UI request body is pre-filled with valid sample data on "Try it out", not empty/zero values
+  - `AuthController` — `@Tag`/`@Operation` summaries added for readability in the Swagger UI endpoint list; `@SecurityRequirement(name = "bearerAuth")` on `/me` so Swagger UI shows the lock icon and requires a token
+  - Swagger UI will be at `/swagger-ui.html` once the app is running (default springdoc path, not customized)
+  - **Not yet verified in-browser**: `mvnw compile` passes and the app boots up to the same JPA/Hibernate step as before, but still fails at `entityManagerFactory` creation — no real Postgres connection available in this dev environment (same blocker as the `contextLoads` test, see above). To actually try register/login through Swagger UI, run the app against a real Postgres with `DB_URL`/`DB_USERNAME`/`DB_PASSWORD`/`JWT_SECRET` set, then open `http://localhost:8080/swagger-ui.html`
+  - No DB seed/sample rows added — "sample data" here means pre-filled example values in the Swagger request forms, not seeded database rows. Since `register` creates its own account, no seed data is needed to try the full register → login flow
 
 ## History
 
