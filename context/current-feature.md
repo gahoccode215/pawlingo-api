@@ -2,7 +2,7 @@
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
@@ -23,6 +23,21 @@ Not Started
 
 ## Notes
 
+- Implemented so far (branch `feature/authentication-email-password-mvp`):
+  - `pom.xml` — added web, data-jpa, security, validation, postgresql, flyway-core (+flyway-database-postgresql), lombok, jjwt 0.12.6
+  - `application.yaml` — datasource/JWT secret/CORS origin all via env vars (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `JWT_EXPIRATION_SECONDS`, `CORS_ALLOWED_ORIGINS`), `ddl-auto: none`, Flyway enabled
+  - `src/main/resources/db/migration/V1__create_users_table.sql`
+  - `user` package: `User` entity, `Goal` enum (JSON value `beginner`/`test-prep`/`professional`/`for-child` via `@JsonValue`/`@JsonCreator`, DB stores enum name via `@Enumerated(STRING)`), `AuthProvider` enum, `user/repository/UserRepository`
+  - `common/response`: `ApiResponseDTO<T>` (renamed from `ApiResponse` to avoid a future clash with springdoc-openapi's own response type), `ErrorDetail`
+  - `common/exception`: `BusinessException` + `ErrorCode` enum (replaced per-error exception classes `DuplicateEmailException`/`InvalidCredentialsException` — new business errors are now a new `ErrorCode` constant, not a new file), `GlobalExceptionHandler` (409/401/400/500)
+  - `common/security`: `JwtAuthenticationFilter`, `JwtAuthenticationEntryPoint` (401 via envelope, reuses `ErrorCode.UNAUTHORIZED`, not Spring's default plain-text 401)
+  - `common/config/SecurityConfig`: stateless JWT, BCrypt bean, permits register/login, CORS from `app.cors.allowed-origins`
+  - `auth` package restructured by layer: `auth/controller/AuthController`, `auth/service/AuthService` (interface) + `auth/service/impl/AuthServiceImpl`, `auth/service/JwtService` (no interface — single implementation, only used inside `auth`), DTOs in `auth/dto/request/` (`RegisterRequest`, `LoginRequest`) and `auth/dto/response/` (`RegisterResponse`, `LoginResponse`, `MeResponse`)
+  - Pet auto-creation on register is a no-op with a TODO comment pointing at `auth-spec.md#data-model` (Pet entity doesn't exist yet — per spec, don't block auth merge on it)
+  - `AuthServiceImplTest` (`auth/service/impl`) — 5 Mockito unit tests against `AuthServiceImpl` (register success/duplicate, login success/wrong-password/unknown-email), all passing
+- Build note: Spring Boot 4.1.0 ships Jackson 3 (`tools.jackson.databind`, not `com.fasterxml.jackson.databind`) — `JwtAuthenticationEntryPoint` uses the `tools.jackson` import accordingly
+- `mvnw compile` and the 5 new unit tests pass. The pre-existing `PawlingoApiApplicationTests.contextLoads` smoke test now fails because it boots the full Spring context, which needs a live Postgres connection — no DB/Docker is provisioned in this dev environment yet. Not a code defect; needs either a local Postgres or Testcontainers+Docker once available.
+- `pawlingo-api` had no git repo before this feature — initialized one and made a baseline commit on `main` before branching
 - Spec: `context/features/auth-spec.md`
 - Google OAuth is explicitly out of scope for this pass (separate future feature) — don't let it block Pet/Vocab/Progress work
 - Also out of scope: refresh token/logout-all-devices, forgot/reset password via email, login rate limiting (should come soon after but not blocking MVP)

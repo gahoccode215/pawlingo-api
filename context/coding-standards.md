@@ -6,28 +6,41 @@ Applies to all code in this Spring Boot repo (Java 21 / Spring Boot 4.1.0).
 
 ## 1. Package structure
 
-Organize by **feature (package-by-feature)**, not by layer, so it scales cleanly as modules (auth, pet, vocab, progress...) are added:
+Top level is organized by **feature (package-by-feature)** — auth, user, pet, vocab, progress... — so it scales cleanly as modules are added. **Within** each feature package, organize by layer:
 
 ```
 com.pawlingo.api
 ├── auth
-│   ├── AuthController.java
-│   ├── AuthService.java
-│   ├── dto/            (RegisterRequest, LoginRequest, AuthResponse...)
-│   └── entity/          (if the entity belongs only to this module)
+│   ├── controller/
+│   │   └── AuthController.java
+│   ├── service/
+│   │   ├── AuthService.java        (interface)
+│   │   ├── JwtService.java          (no interface — single implementation, not swapped/mocked at the interface level)
+│   │   └── impl/
+│   │       └── AuthServiceImpl.java
+│   └── dto/
+│       ├── request/     (RegisterRequest, LoginRequest...)
+│       └── response/    (RegisterResponse, LoginResponse, MeResponse...)
 ├── user
+│   ├── repository/
+│   │   └── UserRepository.java
+│   └── User.java, Goal.java, AuthProvider.java (entities/enums live directly in the feature package, not under entity/, since user has no other layers yet)
 ├── pet
 ├── vocab
 ├── progress
 ├── common
-│   ├── response/        (ApiResponse<T>, ErrorResponse)
-│   ├── exception/        (GlobalExceptionHandler, custom exceptions)
+│   ├── response/        (ApiResponseDTO<T>, ErrorDetail)
+│   ├── exception/        (GlobalExceptionHandler, BusinessException, ErrorCode)
+│   ├── security/          (JwtAuthenticationFilter, JwtAuthenticationEntryPoint)
 │   ├── config/            (SecurityConfig, OpenApiConfig...)
 │   └── util/
 └── PawlingoApiApplication.java
 ```
 
-Each feature package typically has: `*Controller`, `*Service` (+ `*ServiceImpl` if an interface is needed), `*Repository`, `entity/`, `dto/`.
+- `service/` holds the interface directly; the implementation lives in `service/impl/` as `*ServiceImpl` (e.g. `AuthService` + `AuthServiceImpl`). Controllers and other services depend on the interface type, never the impl, so Spring injects by interface and the impl stays swappable/mockable.
+- A service only needs this interface+impl split when it's a business service consumed elsewhere via its interface (e.g. `AuthService`). A narrow technical utility used by exactly one caller (e.g. `JwtService`, only used inside `auth`) can stay a concrete `@Service` class in `service/` without an interface — don't split it just for consistency.
+- `repository/` holds `*Repository` interfaces (`extends JpaRepository`).
+- Each feature package typically has: `controller/`, `service/` (+`service/impl/`), `repository/`, `entity/` (if needed), `dto/request/`, `dto/response/`.
 
 ---
 
@@ -66,17 +79,19 @@ Each feature package typically has: `*Controller`, `*Service` (+ `*ServiceImpl` 
 All API responses go through one unified envelope:
 
 ```java
-public record ApiResponse<T>(boolean success, T data, ErrorDetail error) {
-    public static <T> ApiResponse<T> ok(T data) {
-        return new ApiResponse<>(true, data, null);
+public record ApiResponseDTO<T>(boolean success, T data, ErrorDetail error) {
+    public static <T> ApiResponseDTO<T> ok(T data) {
+        return new ApiResponseDTO<>(true, data, null);
     }
-    public static <T> ApiResponse<T> fail(String code, String message) {
-        return new ApiResponse<>(false, null, new ErrorDetail(code, message));
+    public static <T> ApiResponseDTO<T> fail(String code, String message) {
+        return new ApiResponseDTO<>(false, null, new ErrorDetail(code, message));
     }
 }
 
 public record ErrorDetail(String code, String message) {}
 ```
+
+> Named `ApiResponseDTO` (not `ApiResponse`) to avoid a class-name clash with springdoc-openapi's own response types once Swagger is added.
 
 - Every Controller returns `ResponseEntity<ApiResponse<T>>`.
 - Errors are handled centrally via `@RestControllerAdvice` (`GlobalExceptionHandler`), not scattered try/catch blocks in Controllers.
@@ -85,8 +100,8 @@ public record ErrorDetail(String code, String message) {}
 
 ## 6. Exception handling
 
-- Define domain-specific exceptions extending `RuntimeException`, e.g. `ResourceNotFoundException`, `InvalidCredentialsException`, `DuplicateEmailException`.
-- `GlobalExceptionHandler` maps each exception type to the appropriate HTTP status + `ApiResponse.fail(...)`.
+- Domain/business errors go through a single `BusinessException(ErrorCode)` (`common/exception`) instead of one class per error — `ErrorCode` is an enum carrying `HttpStatus` + default message per case (`DUPLICATE_EMAIL`, `INVALID_CREDENTIALS`, ...). Adding a new business error is a new enum constant, not a new `.java` file.
+- `GlobalExceptionHandler` has one `@ExceptionHandler(BusinessException.class)` that reads `ex.getErrorCode()` to build the `ApiResponseDTO.fail(...)`.
 - Validation errors (`MethodArgumentNotValidException`) → HTTP 400 with a list of field errors in `error.message` or a dedicated field for more detail.
 - Never leak stack traces or internal messages (raw SQL, root exception) through the API.
 
