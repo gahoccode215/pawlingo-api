@@ -20,6 +20,7 @@ import com.pawlingo.api.auth.service.GoogleUserInfo;
 import com.pawlingo.api.auth.service.JwtService;
 import com.pawlingo.api.common.exception.BusinessException;
 import com.pawlingo.api.common.exception.ErrorCode;
+import com.pawlingo.api.pet.service.PetService;
 import com.pawlingo.api.user.entity.User;
 import com.pawlingo.api.user.enums.AuthProvider;
 import com.pawlingo.api.user.enums.Goal;
@@ -48,11 +49,14 @@ class AuthServiceImplTest {
     @Mock
     private GoogleTokenVerifier googleTokenVerifier;
 
+    @Mock
+    private PetService petService;
+
     private AuthServiceImpl authService;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthServiceImpl(userRepository, passwordEncoder, jwtService, googleTokenVerifier);
+        authService = new AuthServiceImpl(userRepository, passwordEncoder, jwtService, googleTokenVerifier, petService);
     }
 
     @Test

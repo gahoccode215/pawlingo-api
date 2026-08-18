@@ -1,20 +1,38 @@
-# Current Feature
+# Current Feature: Vocabulary Learning — Phase 2: Progress + Pet-linked XP
 
 ## Status
 
-
+In Progress
 
 ## Goals
 
-
+- User có `Pet` ngay sau khi đăng ký (cả LOCAL và GOOGLE) — không còn là TODO.
+- Mỗi lượt trả lời đúng/sai một từ vựng ghi được vào `Progress`, gắn với `activityType` cụ thể.
+- XP tích luỹ → `Pet` lên "stage" theo ngưỡng XP.
+- Energy của `Pet` tăng khi học đúng, giảm khi sai — phản hồi tức thời.
+- Khung điểm số (XP/energy theo từng `activityType`) tách khỏi logic ghi nhận.
 
 ## Endpoints
 
-
+| Method | Path | Status |
+|---|---|---|
+| GET | `/api/v1/pet` | Planned |
+| POST | `/api/v1/progress` | Planned |
 
 ## Notes
 
-
+- Spec đầy đủ: `context/features/vocab-phase-2-progress-pet-xp.md` (Phase 2/4 của `vocab-learning-roadmap.md`).
+- 4 quyết định đã chốt với user trước khi code:
+  1. Hệ số XP/energy: hằng số trong code (`ActivityScoringPolicy`), không phải bảng DB.
+  2. `activityType=QUIZ`: đúng +10 XP/+5 energy, sai +0 XP/-5 energy.
+  3. Ngưỡng lên stage (placeholder): 5 stage tại XP 0/100/300/600/1000.
+  4. `Progress` nằm ở package riêng `progress`, không gộp vào `vocab`.
+- Package mới: `pet` (`entity`, `repository`, `service`+`impl`, `controller`, `dto/response`) và `progress` (tương tự).
+- `Pet.userId`/`Progress.userId`/`Progress.vocabWordId` dùng UUID field thường, không phải JPA relation — tránh entity của package này phụ thuộc entity package khác (`user`, `vocab`); FK constraint vẫn có ở tầng DB migration.
+- Migration mới: `V4__create_pets_and_progress.sql`.
+- Sửa `AuthServiceImpl.register()` và `loginWithGoogle()` (nhánh user mới) để gọi `petService.createDefaultPet()` — đóng TODO từ Auth MVP.
+- Lưu ý: user đã tồn tại từ trước migration này (tạo trước khi Phase 2 deploy) sẽ **không có Pet** — `GET /api/v1/pet`/`POST /api/v1/progress` cho các user đó sẽ trả `404 PET_NOT_FOUND`. Không backfill tự động trong phase này.
+- Trick unlock, energy tự giảm theo thời gian, Leitner state — out of scope, để phase sau theo đúng spec.
 
 ## History
 

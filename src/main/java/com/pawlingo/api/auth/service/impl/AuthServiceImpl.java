@@ -13,6 +13,7 @@ import com.pawlingo.api.auth.service.GoogleUserInfo;
 import com.pawlingo.api.auth.service.JwtService;
 import com.pawlingo.api.common.exception.BusinessException;
 import com.pawlingo.api.common.exception.ErrorCode;
+import com.pawlingo.api.pet.service.PetService;
 import com.pawlingo.api.user.entity.User;
 import com.pawlingo.api.user.enums.AuthProvider;
 import com.pawlingo.api.user.enums.Goal;
@@ -31,16 +32,19 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final GoogleTokenVerifier googleTokenVerifier;
+    private final PetService petService;
 
     public AuthServiceImpl(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            GoogleTokenVerifier googleTokenVerifier) {
+            GoogleTokenVerifier googleTokenVerifier,
+            PetService petService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.googleTokenVerifier = googleTokenVerifier;
+        this.petService = petService;
     }
 
     @Override
@@ -58,10 +62,7 @@ public class AuthServiceImpl implements AuthService {
                 .authProvider(AuthProvider.LOCAL)
                 .build();
         user = userRepository.save(user);
-
-        // TODO (see auth-spec.md#data-model): auto-create a default Pet for this user
-        // once the Pet entity/repository exists. Intentionally a no-op until then so
-        // auth can ship without blocking on the Pet module.
+        petService.createDefaultPet(user.getId());
 
         String accessToken = jwtService.generateToken(user.getId(), user.getEmail());
         return new RegisterResponse(user.getId(), user.getEmail(), user.getGoal(), accessToken);
@@ -113,7 +114,9 @@ public class AuthServiceImpl implements AuthService {
                 .authProvider(AuthProvider.GOOGLE)
                 .googleId(googleUserInfo.googleId())
                 .build();
-        return issueGoogleAuthResponse(userRepository.save(newUser), true);
+        User savedUser = userRepository.save(newUser);
+        petService.createDefaultPet(savedUser.getId());
+        return issueGoogleAuthResponse(savedUser, true);
     }
 
     private GoogleAuthResponse issueGoogleAuthResponse(User user, boolean isNewUser) {

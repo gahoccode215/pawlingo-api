@@ -11,7 +11,9 @@ public enum ErrorCode {
     GOOGLE_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "Invalid Google ID token"),
     GOOGLE_EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "Google account email is not verified"),
     ACCOUNT_EXISTS_WITH_PASSWORD(HttpStatus.CONFLICT, "An account with this email already exists, log in with your password"),
-    TOPIC_NOT_FOUND(HttpStatus.NOT_FOUND, "Topic not found");
+    TOPIC_NOT_FOUND(HttpStatus.NOT_FOUND, "Topic not found"),
+    VOCAB_WORD_NOT_FOUND(HttpStatus.NOT_FOUND, "Vocabulary word not found"),
+    PET_NOT_FOUND(HttpStatus.NOT_FOUND, "Pet not found for this user");
 
     private final HttpStatus status;
     private final String defaultMessage;
