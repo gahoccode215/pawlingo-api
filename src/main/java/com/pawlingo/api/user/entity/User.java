@@ -36,7 +36,7 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash")
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
@@ -46,6 +46,9 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "auth_provider", nullable = false)
     private AuthProvider authProvider;
+
+    @Column(name = "google_id", unique = true)
+    private String googleId;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

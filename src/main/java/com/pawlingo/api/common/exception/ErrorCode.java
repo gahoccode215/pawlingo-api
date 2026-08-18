@@ -7,7 +7,10 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "Invalid email or password"),
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "Invalid request"),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "Missing or invalid access token"),
-    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong");
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong"),
+    GOOGLE_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "Invalid Google ID token"),
+    GOOGLE_EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "Google account email is not verified"),
+    ACCOUNT_EXISTS_WITH_PASSWORD(HttpStatus.CONFLICT, "An account with this email already exists, log in with your password");
 
     private final HttpStatus status;
     private final String defaultMessage;

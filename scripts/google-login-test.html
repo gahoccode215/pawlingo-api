@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<title>PawLingo - Google Login Test</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+  h1 { font-size: 1.2rem; }
+  textarea { width: 100%; height: 90px; font-family: monospace; font-size: 12px; }
+  pre { background: #f4f4f4; padding: 12px; border-radius: 6px; overflow-x: auto; white-space: pre-wrap; }
+  .row { margin: 16px 0; }
+  label { display: block; font-weight: bold; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+  <h1>PawLingo - Google Login Test</h1>
+
+  <div class="row">
+    <label>1. Backend URL</label>
+    <input id="backendUrl" style="width:100%" value="http://localhost:8080/api/v1/auth/google" />
+  </div>
+
+  <div class="row">
+    <label>2. Đăng nhập Google</label>
+    <div id="g_id_onload"
+         data-client_id="156321789367-vlui6t8tad2modbc1pn1fnrq4511ra9k.apps.googleusercontent.com"
+         data-callback="handleCredentialResponse">
+    </div>
+    <div class="g_id_signin" data-type="standard"></div>
+  </div>
+
+  <div class="row">
+    <label>3. ID token nhận được từ Google (copy để test curl thủ công nếu muốn)</label>
+    <textarea id="idToken" readonly></textarea>
+  </div>
+
+  <div class="row">
+    <label>4. Response từ backend (POST /auth/google)</label>
+    <pre id="result">(chưa gọi)</pre>
+  </div>
+
+  <script>
+    async function handleCredentialResponse(response) {
+      const idToken = response.credential;
+      document.getElementById('idToken').value = idToken;
+
+      const backendUrl = document.getElementById('backendUrl').value;
+      const resultEl = document.getElementById('result');
+      resultEl.textContent = 'Đang gọi backend...';
+
+      try {
+        const res = await fetch(backendUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken }),
+        });
+        const body = await res.json();
+        resultEl.textContent = `HTTP ${res.status}\n\n` + JSON.stringify(body, null, 2);
+      } catch (err) {
+        resultEl.textContent = 'Lỗi gọi backend: ' + err;
+      }
+    }
+  </script>
+</body>
+</html>

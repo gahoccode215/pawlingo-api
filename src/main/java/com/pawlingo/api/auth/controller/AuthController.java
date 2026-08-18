@@ -1,7 +1,9 @@
 package com.pawlingo.api.auth.controller;
 
+import com.pawlingo.api.auth.dto.request.GoogleAuthRequest;
 import com.pawlingo.api.auth.dto.request.LoginRequest;
 import com.pawlingo.api.auth.dto.request.RegisterRequest;
+import com.pawlingo.api.auth.dto.response.GoogleAuthResponse;
 import com.pawlingo.api.auth.dto.response.LoginResponse;
 import com.pawlingo.api.auth.dto.response.MeResponse;
 import com.pawlingo.api.auth.dto.response.RegisterResponse;
@@ -44,6 +46,15 @@ public class AuthController {
     public ResponseEntity<ApiResponseDTO<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse response = authService.login(request);
         return ResponseEntity.ok(ApiResponseDTO.ok(response));
+    }
+
+    @PostMapping("/google")
+    @Operation(summary = "Log in or register via a Google ID token, returns a JWT access token")
+    public ResponseEntity<ApiResponseDTO<GoogleAuthResponse>> loginWithGoogle(
+            @Valid @RequestBody GoogleAuthRequest request) {
+        GoogleAuthResponse response = authService.loginWithGoogle(request);
+        HttpStatus status = response.isNewUser() ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(ApiResponseDTO.ok(response));
     }
 
     @GetMapping("/me")
