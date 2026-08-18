@@ -1,38 +1,20 @@
-# Current Feature: Vocabulary Learning — Phase 2: Progress + Pet-linked XP
+# Current Feature
 
 ## Status
 
-In Progress
+
 
 ## Goals
 
-- User có `Pet` ngay sau khi đăng ký (cả LOCAL và GOOGLE) — không còn là TODO.
-- Mỗi lượt trả lời đúng/sai một từ vựng ghi được vào `Progress`, gắn với `activityType` cụ thể.
-- XP tích luỹ → `Pet` lên "stage" theo ngưỡng XP.
-- Energy của `Pet` tăng khi học đúng, giảm khi sai — phản hồi tức thời.
-- Khung điểm số (XP/energy theo từng `activityType`) tách khỏi logic ghi nhận.
+
 
 ## Endpoints
 
-| Method | Path | Status |
-|---|---|---|
-| GET | `/api/v1/pet` | Planned |
-| POST | `/api/v1/progress` | Planned |
+
 
 ## Notes
 
-- Spec đầy đủ: `context/features/vocab-phase-2-progress-pet-xp.md` (Phase 2/4 của `vocab-learning-roadmap.md`).
-- 4 quyết định đã chốt với user trước khi code:
-  1. Hệ số XP/energy: hằng số trong code (`ActivityScoringPolicy`), không phải bảng DB.
-  2. `activityType=QUIZ`: đúng +10 XP/+5 energy, sai +0 XP/-5 energy.
-  3. Ngưỡng lên stage (placeholder): 5 stage tại XP 0/100/300/600/1000.
-  4. `Progress` nằm ở package riêng `progress`, không gộp vào `vocab`.
-- Package mới: `pet` (`entity`, `repository`, `service`+`impl`, `controller`, `dto/response`) và `progress` (tương tự).
-- `Pet.userId`/`Progress.userId`/`Progress.vocabWordId` dùng UUID field thường, không phải JPA relation — tránh entity của package này phụ thuộc entity package khác (`user`, `vocab`); FK constraint vẫn có ở tầng DB migration.
-- Migration mới: `V4__create_pets_and_progress.sql`.
-- Sửa `AuthServiceImpl.register()` và `loginWithGoogle()` (nhánh user mới) để gọi `petService.createDefaultPet()` — đóng TODO từ Auth MVP.
-- Lưu ý: user đã tồn tại từ trước migration này (tạo trước khi Phase 2 deploy) sẽ **không có Pet** — `GET /api/v1/pet`/`POST /api/v1/progress` cho các user đó sẽ trả `404 PET_NOT_FOUND`. Không backfill tự động trong phase này.
-- Trick unlock, energy tự giảm theo thời gian, Leitner state — out of scope, để phase sau theo đúng spec.
+
 
 ## History
 
@@ -45,4 +27,5 @@ In Progress
 - 2026-08-19: Completed Authentication & Authorization via Google (Google OAuth) — `POST /api/v1/auth/google` verifies a Google ID token (`google-api-client`, `GoogleIdTokenVerifier` audience-checked against `GOOGLE_CLIENT_ID`; no client secret needed, ID-token-verification flow chosen over `spring-boot-starter-oauth2-client` since FE is a Next.js SPA using Google Identity Services client-side, not server redirect). Find-or-create logic: match by `googleId` first, then by email — an email match against an existing LOCAL account is rejected with `409 ACCOUNT_EXISTS_WITH_PASSWORD` rather than silently merged; a legacy GOOGLE row missing `googleId` gets backfilled. New user gets `authProvider = GOOGLE`, `passwordHash = null`. Same JWT issuance/response shape as email+password login (`isNewUser` flag added so FE can trigger onboarding). Schema: `V2__alter_users_for_google_oauth.sql` — `password_hash` now nullable, unique nullable `google_id` column added. New error codes `GOOGLE_TOKEN_INVALID` (401), `GOOGLE_EMAIL_NOT_VERIFIED` (403), `ACCOUNT_EXISTS_WITH_PASSWORD` (409). Email is now lowercased on register/login/google for consistent lookups; LOCAL/GOOGLE `passwordHash` invariant enforced in the service layer. `GoogleTokenVerifier`/`GoogleUserInfo` added as narrow single-caller technical utilities in `auth/service/` (same pattern as `JwtService`, no interface). 11/11 tests passing; migration applied and manually verified live against the real Neon Postgres via a local test harness (`scripts/google-login-test.html`, a static page using Google Identity Services to get a real ID token and POST it to the backend). Also added, at user's request for this verification: a debug-only `GET /api/v1/users` (lists users without leaking `passwordHash`) and a `SecurityConfig` refactor extracting hardcoded public paths / CORS lists into `WHITELIST_ENDPOINTS`, `CORS_ALLOWED_METHODS`, `CORS_ALLOWED_HEADERS` constants — **`GET /api/v1/users` is currently in that public whitelist with no auth, which leaks all user emails; this must be re-secured or removed before anything beyond local dev.** A follow-up idea (explicitly deferred, not done): renaming `GET /api/v1/auth/me` to a `/users/...`-style resource path — left for a separate, dedicated refactor since it would be a breaking change to an already-shipped endpoint outside this feature's scope. Account linking endpoint and LOCAL email verification also remain out of scope per spec. Merged to `main` (no PR, direct merge per user request); `feature/google-oauth-login` branch deleted after merge.
 - 2026-08-19: Also wrote and committed a 4-phase Vocabulary Learning roadmap (`context/vocab-learning-roadmap.md`) and detailed specs per phase (`context/features/vocab-phase-{1..4}-*.md`), designed independently of the FE prototype (per user instruction — FE mock is expected to change, so specs propose options rather than mirror FE data shapes) and a `docs/fe-auth-integration.md` guide for the FE team covering the 3 shipped auth endpoints (register/login/google) plus `/auth/me`.
 - 2026-08-19: Completed Vocabulary Learning Phase 1 (Vocab Content API) — `GET /api/v1/vocab/topics`, `GET /api/v1/vocab/topics/{topicCode}`, both requiring JWT (no `SecurityConfig` whitelist change). New `Topic`/`VocabWord` entities (package `vocab`, same layered-within-feature layout as `auth`), seeded via `V3__create_topics_and_vocab_words.sql` with 2 topics (~15 words each). Topics identified by a stable slug `code` in the URL rather than UUID. `VocabWord` already carries `imageUrl`/`audioUrl` (unused, null for now) so Phase 3 activity types (picture match, listening) won't need a schema change — `wordCount` on the topic list is computed via `COUNT`, not a stored column. New error code `TOPIC_NOT_FOUND` (404). 14/14 tests passing, migration verified against the real Neon Postgres via the Spring context-load test. No scope creep this time (no extra debug endpoints). Next up: Phase 2 (`vocab-phase-2-progress-pet-xp.md`) — `Pet`/`Progress` entities, closes the Pet-auto-creation TODO from Auth MVP. Merged to `main` (no PR, direct merge per user request); `feature/vocab-phase-1-content-api` branch deleted after merge.
+- 2026-08-19: Completed Vocabulary Learning Phase 2 (Progress + Pet-linked XP) — `POST /api/v1/progress`, `GET /api/v1/pet`, both requiring JWT. New `Pet`/`Progress` entities (packages `pet`, `progress`; `userId`/`vocabWordId` stored as plain UUID fields rather than JPA relations, to keep these packages decoupled from `user`/`vocab` entities — FK constraints still enforced at the DB level in `V4__create_pets_and_progress.sql`). Scoring is table-driven via `ActivityScoringPolicy` (in-code `Map<ActivityType, ScoringRule>`, not a DB table) and stage thresholds via `PetStagePolicy` (placeholder 5-stage curve at XP 0/100/300/600/1000) — both swappable without a migration when Phase 3 adds activity types. `activityType=QUIZ`: correct = +10 XP/+5 energy, wrong = +0 XP/-5 energy; energy clamped 0-100. Closed the Pet-auto-creation TODO from Auth MVP: `AuthServiceImpl.register()` and `loginWithGoogle()` (new-user branch) now create a default `Pet` in the same transaction as the `User`. New error codes `VOCAB_WORD_NOT_FOUND`, `PET_NOT_FOUND` (404) — users created before this migration have no `Pet` row and will 404 on `/pet`/`/progress` until Phase-3-or-later backfill, not done automatically here. Also fixed a pre-existing gap found while implementing: `GlobalExceptionHandler` had no handler for `HttpMessageNotReadableException`, so an invalid enum value in a JSON body (`Goal`, and now `ActivityType`) was falling through to `500 INTERNAL_ERROR` instead of the intended `400 VALIDATION_ERROR` — added the handler, no other behavior change. 22/22 tests passing, `V4` migration verified against the real Neon Postgres via the Spring context-load test. Trick unlock, energy-decay-over-time, and Leitner/spaced-repetition state remain out of scope per spec, deferred to Phase 3+. Merged to `main` (no PR, direct merge per user request); `feature/vocab-phase-2-progress-pet-xp` branch deleted after merge.
 </content>
