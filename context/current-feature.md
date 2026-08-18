@@ -1,20 +1,33 @@
-# Current Feature
+# Current Feature: Vocabulary Learning — Phase 1: Vocab Content API
 
 ## Status
 
-
+In Progress
 
 ## Goals
 
-
+- FE lấy được danh sách chủ đề (topic) để hiện màn chọn chủ đề.
+- FE lấy được danh sách từ trong 1 chủ đề để chạy flashcard/quiz.
+- Schema đủ chỗ cho ảnh/audio ngay từ đầu (dù chưa dùng) để Phase 3 (ghép hình, nghe) không cần migration thêm cột.
+- Nội dung (chủ đề, từ vựng) quản lý được qua DB, không hardcode trong code Java.
 
 ## Endpoints
 
-
+| Method | Path | Status |
+|---|---|---|
+| GET | `/api/v1/vocab/topics` | Planned |
+| GET | `/api/v1/vocab/topics/{topicCode}` | Planned |
 
 ## Notes
 
-
+- Spec đầy đủ: `context/features/vocab-phase-1-content-api.md` (phần của `context/vocab-learning-roadmap.md`, Phase 1/4).
+- 3 quyết định đã chốt với user trước khi code:
+  1. Định danh topic trong URL: **slug/code** (vd `animals`), không dùng UUID.
+  2. Nguồn nội dung: **seed cứng trong Flyway migration** (vài chục từ mẫu), không xây admin API ở phase này.
+  3. Endpoint **cần JWT** (giữ nhất quán với convention hiện tại — mọi endpoint trừ register/login/google đều yêu cầu Bearer token).
+- Package mới `vocab` (ngang hàng `auth`, `user`): `entity/`, `repository/`, `service/`+`service/impl/`, `controller/`, `dto/response/`.
+- Migration mới: `V3__create_topics_and_vocab_words.sql`.
+- Chưa đụng `Pet`/XP/`Progress` — thuần content API, đó là Phase 2 (`vocab-phase-2-progress-pet-xp.md`).
 
 ## History
 

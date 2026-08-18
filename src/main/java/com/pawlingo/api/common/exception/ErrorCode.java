@@ -10,7 +10,8 @@ public enum ErrorCode {
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Something went wrong"),
     GOOGLE_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "Invalid Google ID token"),
     GOOGLE_EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "Google account email is not verified"),
-    ACCOUNT_EXISTS_WITH_PASSWORD(HttpStatus.CONFLICT, "An account with this email already exists, log in with your password");
+    ACCOUNT_EXISTS_WITH_PASSWORD(HttpStatus.CONFLICT, "An account with this email already exists, log in with your password"),
+    TOPIC_NOT_FOUND(HttpStatus.NOT_FOUND, "Topic not found");
 
     private final HttpStatus status;
     private final String defaultMessage;
