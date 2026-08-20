@@ -61,7 +61,7 @@ class AuthServiceImplTest {
 
     @Test
     void register_newEmail_createsUserAndReturnsToken() {
-        RegisterRequest request = new RegisterRequest("user@example.com", "password123", null);
+        RegisterRequest request = new RegisterRequest("user@example.com", "password123");
         when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password123")).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
@@ -81,7 +81,7 @@ class AuthServiceImplTest {
 
     @Test
     void register_duplicateEmail_throwsBusinessExceptionWithDuplicateEmailCode() {
-        RegisterRequest request = new RegisterRequest("user@example.com", "password123", null);
+        RegisterRequest request = new RegisterRequest("user@example.com", "password123");
         when(userRepository.existsByEmail("user@example.com")).thenReturn(true);
 
         assertThatThrownBy(() -> authService.register(request))
@@ -226,7 +226,7 @@ class AuthServiceImplTest {
 
     @Test
     void register_mixedCaseEmail_isNormalizedToLowercase() {
-        RegisterRequest request = new RegisterRequest("User@Example.com", "password123", null);
+        RegisterRequest request = new RegisterRequest("User@Example.com", "password123");
         when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
         when(passwordEncoder.encode("password123")).thenReturn("hashed");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> {

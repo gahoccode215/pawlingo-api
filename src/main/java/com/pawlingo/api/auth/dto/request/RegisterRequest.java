@@ -1,6 +1,5 @@
 package com.pawlingo.api.auth.dto.request;
 
-import com.pawlingo.api.user.enums.Goal;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -12,5 +11,4 @@ public record RegisterRequest(
                 String email,
         @Schema(example = "password123") @NotBlank(message = "password is required")
                 @Size(min = 8, message = "password must be at least 8 characters")
-                String password,
-        @Schema(example = "beginner") Goal goal) {}
+                String password) {}

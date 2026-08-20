@@ -58,7 +58,7 @@ public class AuthServiceImpl implements AuthService {
         User user = User.builder()
                 .email(email)
                 .passwordHash(passwordEncoder.encode(request.password()))
-                .goal(request.goal() != null ? request.goal() : Goal.BEGINNER)
+                .goal(Goal.BEGINNER)
                 .authProvider(AuthProvider.LOCAL)
                 .build();
         user = userRepository.save(user);
