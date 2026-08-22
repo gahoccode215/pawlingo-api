@@ -63,7 +63,7 @@ Next.js (pawlingo-ui)  --HTTP/JSON-->  Spring Boot (pawlingo-api)  --JPA-->  Pos
 ## 5. API contract
 
 - Base path: `/api/v1`
-- Auth: JWT access token (`Authorization: Bearer <token>`); no refresh token yet.
+- Auth: JWT access token (`Authorization: Bearer <token>`, 15 min lifetime) + a rotating opaque refresh token (30 days, `POST /auth/refresh` to renew).
 - Response envelope: `{ success: boolean, data: T | null, error: { code, message } | null }`
 - Three sources, three jobs — don't re-derive one from another by hand:
   - **This table** — current state of every endpoint. Read this to see what exists *right now*.
@@ -72,16 +72,18 @@ Next.js (pawlingo-ui)  --HTTP/JSON-->  Spring Boot (pawlingo-api)  --JPA-->  Pos
 
 | Method | Path | Status | Description |
 |---|---|---|---|
-| POST | `/auth/register` | **Implemented** | Register with email/password, returns JWT |
-| POST | `/auth/login` | **Implemented** | Login with email/password, returns JWT |
-| POST | `/auth/google` | **Implemented** | Login or register via a Google ID token, returns JWT |
+| POST | `/auth/register` | **Implemented** | Register with email/password; returns `{ accessToken, refreshToken, expiresIn }` |
+| POST | `/auth/login` | **Implemented** | Login with email/password; returns `{ accessToken, refreshToken, expiresIn }` |
+| POST | `/auth/google` | **Implemented** | Login or register via a Google ID token; returns `{ accessToken, refreshToken, expiresIn, isNewUser }` |
+| POST | `/auth/refresh` | **Implemented** | Exchange a refresh token for a new access+refresh pair; rotates on every call |
+| POST | `/auth/logout` | **Implemented** | Revoke a single refresh token; public — works even with an expired access token |
 | GET | `/auth/me` | **Implemented** | Current authenticated user |
 | GET | `/pet` | **Implemented** | Current user's pet |
 | GET | `/users` | **Implemented (debug-only)** | List all users, no pagination — see security note below |
 
 `/vocabularies`, `/vocabularies/{id}`, and `/progress` existed on `main` but were removed (see §7) — they'll reappear here once vocab is rebuilt.
 
-Auth is public on `register`/`login`/`google` only; every other endpoint requires a valid JWT by default (`common/config/SecurityConfig`).
+Auth is public on `register`/`login`/`google`/`refresh`/`logout` only; every other endpoint requires a valid JWT by default (`common/config/SecurityConfig`).
 
 **⚠ Security note:** `GET /users` is currently in `SecurityConfig`'s whitelist and requires no auth at all, exposing every user's email. It was whitelisted for local debugging during Google OAuth testing and was never meant to stay that way — it needs to be removed from the whitelist (or gated behind an admin role) before this goes anywhere beyond local dev.
 
@@ -90,12 +92,11 @@ Auth is public on `register`/`login`/`google` only; every other endpoint require
 ## 6. Roadmap (backend portion)
 
 **MVP — done:**
-- Auth: email/password + Google OAuth, JWT issuance.
+- Auth: email/password + Google OAuth, JWT access token + rotating/revocable refresh token.
 - Entities + migrations for User, Pet.
 
 **MVP — in progress / next:**
-- Auth: access + refresh tokens (rotating, revocable) — see `current-feature.md`.
-- Vocabulary content + Progress/pet XP — previously implemented, then removed on `feature/vocabulary-content-refactor` to reset the data model; will be rebuilt from scratch after auth is done (see §7).
+- Vocabulary content + Progress/pet XP — previously implemented, then removed on `feature/vocabulary-content-refactor` to reset the data model; will be rebuilt from scratch now that auth is done (see §7).
 - Spaced repetition logic.
 - Daily reminders (push/email) — could be a scheduled job or an external service integration.
 
@@ -111,9 +112,9 @@ Auth is public on `register`/`login`/`google` only; every other endpoint require
 
 ## 7. Current status
 
-- Backend: auth (email/password + Google OAuth) is implemented. See the API contract table in §5.
-- **Vocab and Progress were removed** (both the original `Topic`/`VocabWord`/`Progress` implementation and the in-progress consolidation into a single `Vocabulary` entity on `feature/vocabulary-content-refactor`) — the `vocab/` and `progress/` packages, their tests, and their migrations (`topics`/`vocab_words`/`progress` tables) are gone from the codebase. Decision: finish auth first, then rebuild vocab (and progress) cleanly from scratch rather than carry the half-finished refactor forward. Flyway migrations were squashed down to `V1__create_users_table.sql` (users, with Google OAuth columns included from the start) + `V2__create_pets_table.sql` (pets only) — safe to do since no real Postgres has ever run these migrations yet (see below).
-- Current focus: complete auth (access + refresh tokens — see `current-feature.md`), then rebuild vocabulary learning.
+- Backend: auth (email/password + Google OAuth, JWT access + rotating refresh tokens) is implemented and complete. See the API contract table in §5.
+- **Vocab and Progress were removed** (both the original `Topic`/`VocabWord`/`Progress` implementation and the in-progress consolidation into a single `Vocabulary` entity on `feature/vocabulary-content-refactor`) — the `vocab/` and `progress/` packages, their tests, and their migrations (`topics`/`vocab_words`/`progress` tables) are gone from the codebase. Decision: finish auth first, then rebuild vocab (and progress) cleanly from scratch rather than carry the half-finished refactor forward. Flyway migrations were squashed down to `V1__create_users_table.sql` (users, with Google OAuth columns included from the start) + `V2__create_pets_table.sql` (pets only), with `V3__create_refresh_tokens_table.sql` added for the refresh-token feature — safe to squash since no real Postgres has ever run these migrations yet (see below).
+- Current focus: rebuild vocabulary learning (content + progress/pet XP) now that auth is done.
 - **Testing policy (current):** implement features without writing tests by default; tests are written only when explicitly requested for a specific, already-implemented feature — don't write them proactively per feature.
 - Local dev env vars: `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` (Postgres), `JWT_SECRET`, `GOOGLE_CLIENT_ID` (Google OAuth). No Docker/Testcontainers wired up yet, so tests that need a full Spring context require a real local Postgres.
 - Git: not yet pushed to a remote.
