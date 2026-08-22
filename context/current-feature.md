@@ -1,31 +1,58 @@
-# Current Feature
+# Current Feature: Complete Auth (Email/Password + Google) with Access & Refresh Tokens
 
 ## Status
-
-
+Not Started
 
 ## Goals
-
-
+- Add a rotating, revocable refresh token alongside the existing access token for `register` / `login` / `google` login.
+- Add `POST /auth/refresh` to exchange a valid refresh token for a new access+refresh pair (rotation on every use).
+- Add `POST /auth/logout` to revoke a single refresh token.
+- Shorten access-token lifetime (recommend 15 min) now that the refresh flow covers session continuity, instead of today's 24h access token with no revocation.
+- Shape the response contract so `pawlingo-ui` can integrate via NextAuth/Auth.js: Credentials provider for email/password calling `/auth/login`, Google provider forwarding its `id_token` to `/auth/google`, and the refresh token held only inside NextAuth's server-side encrypted session JWT — never sent to the browser.
 
 ## Endpoints
+| Method | Path | Status | Notes |
+|---|---|---|---|
+| POST | `/auth/register` | Changed | response gains `refreshToken` (+ `expiresIn`, missing today) |
+| POST | `/auth/login` | Changed | response gains `refreshToken` |
+| POST | `/auth/google` | Changed | response gains `refreshToken` |
+| POST | `/auth/refresh` | Planned | body `{ refreshToken }` → new `{ accessToken, refreshToken, expiresIn }` (rotates) |
+| POST | `/auth/logout` | Planned | body `{ refreshToken }` → revokes it; callable without a valid access token |
 
+## Data Model
+New `refresh_tokens` table: `id`, `user_id` (FK), `token_hash` (SHA-256 of the opaque token, never store plaintext), `issued_at`, `expires_at`, `revoked_at`, `replaced_by_token_id` (self-FK, for rotation chains). Optional `user_agent`/`ip` columns now (cheap to add) to support a future "manage sessions" view, even though that UI is out of scope this pass.
 
+## Validation
+- Refresh token request body: non-blank string.
+- Lookup hashes the incoming token (SHA-256) and compares against `token_hash` — plaintext refresh tokens are never persisted or logged.
 
-## Notes
+## Security
+- **Access token**: JWT, short-lived (recommend dropping `app.jwt.expiration-seconds` default from 86400 to 900 = 15 min).
+- **Refresh token**: opaque random value (256-bit), *not* a JWT — no server state means no revocation, which is the whole point of adding this table.
+- **Rotation**: every `/auth/refresh` call issues a new refresh token and marks the old one `revoked_at` + `replaced_by_token_id`.
+- **Reuse detection**: presenting an already-revoked/replaced refresh token revokes the *entire* token chain for that user (signals theft) and forces re-login on all devices.
+- `logout` only revokes the single presented token (one device/session).
 
+## Error Handling
+New `ErrorCode` entries:
+- `INVALID_REFRESH_TOKEN` (401) — deliberately generic, covers not-found/expired/revoked/reused so a caller can't distinguish "expired" from "stolen and detected" by the response.
 
+## Dependencies & Blockers
+- This branch (`feature/vocabulary-content-refactor`) currently has **no Flyway migration files at all** (V1–V4 were deleted as part of the in-progress vocab consolidation and not yet replaced). The `refresh_tokens` migration needs a migration that (re)creates `users` to exist first — sequence the new migration after that one lands, don't add it in isolation.
+- FE wiring (NextAuth provider config, session/jwt callbacks) lives in `pawlingo-ui`, out of scope for this repo, but the response shapes above are the contract it will integrate against.
+
+## Out of Scope (this pass)
+- Logout-all / revoke-all-sessions for a user.
+- Password reset, email verification, account lockout.
+- Any "manage active sessions" UI/endpoint (beyond storing the columns that would support it later).
+
+## Open Questions
+- Refresh token TTL — proposing 30 days; confirm vs. a shorter window (e.g. 7 days).
+- Storing `user_agent`/`ip` on `refresh_tokens` now (recommended, cheap) vs. adding later.
 
 ## History
 
-- 2026-08-16: Created static landing page prototype at `docs/pawlingo-landing/index.html` per Week 1 waitlist roadmap — hero, problem/why, features, personas, and waitlist CTA sections, styled with Tailwind (CDN) per project-overview.md.
-- 2026-08-16: Reworked header to logo-left/centered-nav/login-register-right layout with mobile menu, and rebuilt footer into a 4-column layout (brand+social, Product, Support, copyright bar) with dynamic year.
-- 2026-08-16: Landing Page Implementation feature left "In Progress" (branch `feature/landing-page-implementation`) — app/ moved to src/app/, all sections rebuilt as React/Tailwind v4 components, build+lint verified — when Vocabulary Learning spec was loaded on top of it. Resume/complete that feature separately before this history entry is superseded further.
-- 2026-08-17: Completed Vocabulary Learning (Week 1 MVP) — topic intro, flashcard, mandatory 4-option quiz, Leitner-style 3-box repetition (wrong answers reset to box 1, capped at 5 repeats), and session summary screens, all wired via `VocabSession` at route `src/app/learn/page.tsx`. Local in-memory state only, no backend/DB. Added `src/types/vocab.ts`, `src/data/vocab/animals.ts`, `src/lib/vocab/{leitner,quiz}.ts`, `src/components/vocab/{TopicIntro,Flashcard,QuizCard,SessionSummary,VocabSession}.tsx`. Build and lint verified; UI not visually tested in-browser by Claude (user tests UI themselves).
-- 2026-08-18: Vocabulary Learning — Phase 2 (persistence, multi-topic, backend-ready) left "In Progress" — localStorage persistence, second topic ("Everyday Food"), topic picker UI (`/learn`, `/learn/[topicId]`), and mock-data isolation (`src/lib/vocab/topics.ts`) all implemented; build+lint verified but UI not yet visually verified in-browser — when Auth spec was loaded on top of it. Resume/complete that feature separately before this history entry is superseded further.
-- 2026-08-18: Completed Authentication (Email/Password) MVP — `POST /api/v1/auth/register`, `POST /api/v1/auth/login`, `GET /api/v1/auth/me`, all live and manually verified against a real Neon Postgres. Stack: Spring Security stateless JWT (`jjwt`), BCrypt hashing, `BusinessException`+`ErrorCode` for centralized error handling, `ApiResponseDTO` envelope, Flyway migration for `users`. Package layout is layered-within-feature (`controller/`, `service/`+`service/impl/`, `repository/`, `dto/request/`+`dto/response/`; entities in `entity/`, enums in `enums/`). Swagger UI added (springdoc 3.1.0) with JWT bearer auth and example request bodies at `/swagger-ui.html`. Fixed a Spring Boot 4.1 gotcha: Flyway autoconfiguration moved out of `spring-boot-autoconfigure` into a separate `spring-boot-flyway` module — without it migrations silently never ran. `.env` now gitignored with a `.env.example` template; README added with run instructions. Pet auto-creation on register left as a TODO (no `Pet` entity yet, per spec). Google OAuth, refresh tokens, and rate limiting explicitly out of scope for this pass. Merged to `main` (no PR, direct merge per user request); `feature/authentication-email-password-mvp` branch deleted after merge.
-- 2026-08-19: Completed Authentication & Authorization via Google (Google OAuth) — `POST /api/v1/auth/google` verifies a Google ID token (`google-api-client`, `GoogleIdTokenVerifier` audience-checked against `GOOGLE_CLIENT_ID`; no client secret needed, ID-token-verification flow chosen over `spring-boot-starter-oauth2-client` since FE is a Next.js SPA using Google Identity Services client-side, not server redirect). Find-or-create logic: match by `googleId` first, then by email — an email match against an existing LOCAL account is rejected with `409 ACCOUNT_EXISTS_WITH_PASSWORD` rather than silently merged; a legacy GOOGLE row missing `googleId` gets backfilled. New user gets `authProvider = GOOGLE`, `passwordHash = null`. Same JWT issuance/response shape as email+password login (`isNewUser` flag added so FE can trigger onboarding). Schema: `V2__alter_users_for_google_oauth.sql` — `password_hash` now nullable, unique nullable `google_id` column added. New error codes `GOOGLE_TOKEN_INVALID` (401), `GOOGLE_EMAIL_NOT_VERIFIED` (403), `ACCOUNT_EXISTS_WITH_PASSWORD` (409). Email is now lowercased on register/login/google for consistent lookups; LOCAL/GOOGLE `passwordHash` invariant enforced in the service layer. `GoogleTokenVerifier`/`GoogleUserInfo` added as narrow single-caller technical utilities in `auth/service/` (same pattern as `JwtService`, no interface). 11/11 tests passing; migration applied and manually verified live against the real Neon Postgres via a local test harness (`scripts/google-login-test.html`, a static page using Google Identity Services to get a real ID token and POST it to the backend). Also added, at user's request for this verification: a debug-only `GET /api/v1/users` (lists users without leaking `passwordHash`) and a `SecurityConfig` refactor extracting hardcoded public paths / CORS lists into `WHITELIST_ENDPOINTS`, `CORS_ALLOWED_METHODS`, `CORS_ALLOWED_HEADERS` constants — **`GET /api/v1/users` is currently in that public whitelist with no auth, which leaks all user emails; this must be re-secured or removed before anything beyond local dev.** A follow-up idea (explicitly deferred, not done): renaming `GET /api/v1/auth/me` to a `/users/...`-style resource path — left for a separate, dedicated refactor since it would be a breaking change to an already-shipped endpoint outside this feature's scope. Account linking endpoint and LOCAL email verification also remain out of scope per spec. Merged to `main` (no PR, direct merge per user request); `feature/google-oauth-login` branch deleted after merge.
-- 2026-08-19: Also wrote and committed a 4-phase Vocabulary Learning roadmap (`context/vocab-learning-roadmap.md`) and detailed specs per phase (`context/features/vocab-phase-{1..4}-*.md`), designed independently of the FE prototype (per user instruction — FE mock is expected to change, so specs propose options rather than mirror FE data shapes) and a `docs/fe-auth-integration.md` guide for the FE team covering the 3 shipped auth endpoints (register/login/google) plus `/auth/me`.
-- 2026-08-19: Completed Vocabulary Learning Phase 1 (Vocab Content API) — `GET /api/v1/vocab/topics`, `GET /api/v1/vocab/topics/{topicCode}`, both requiring JWT (no `SecurityConfig` whitelist change). New `Topic`/`VocabWord` entities (package `vocab`, same layered-within-feature layout as `auth`), seeded via `V3__create_topics_and_vocab_words.sql` with 2 topics (~15 words each). Topics identified by a stable slug `code` in the URL rather than UUID. `VocabWord` already carries `imageUrl`/`audioUrl` (unused, null for now) so Phase 3 activity types (picture match, listening) won't need a schema change — `wordCount` on the topic list is computed via `COUNT`, not a stored column. New error code `TOPIC_NOT_FOUND` (404). 14/14 tests passing, migration verified against the real Neon Postgres via the Spring context-load test. No scope creep this time (no extra debug endpoints). Next up: Phase 2 (`vocab-phase-2-progress-pet-xp.md`) — `Pet`/`Progress` entities, closes the Pet-auto-creation TODO from Auth MVP. Merged to `main` (no PR, direct merge per user request); `feature/vocab-phase-1-content-api` branch deleted after merge.
-- 2026-08-19: Completed Vocabulary Learning Phase 2 (Progress + Pet-linked XP) — `POST /api/v1/progress`, `GET /api/v1/pet`, both requiring JWT. New `Pet`/`Progress` entities (packages `pet`, `progress`; `userId`/`vocabWordId` stored as plain UUID fields rather than JPA relations, to keep these packages decoupled from `user`/`vocab` entities — FK constraints still enforced at the DB level in `V4__create_pets_and_progress.sql`). Scoring is table-driven via `ActivityScoringPolicy` (in-code `Map<ActivityType, ScoringRule>`, not a DB table) and stage thresholds via `PetStagePolicy` (placeholder 5-stage curve at XP 0/100/300/600/1000) — both swappable without a migration when Phase 3 adds activity types. `activityType=QUIZ`: correct = +10 XP/+5 energy, wrong = +0 XP/-5 energy; energy clamped 0-100. Closed the Pet-auto-creation TODO from Auth MVP: `AuthServiceImpl.register()` and `loginWithGoogle()` (new-user branch) now create a default `Pet` in the same transaction as the `User`. New error codes `VOCAB_WORD_NOT_FOUND`, `PET_NOT_FOUND` (404) — users created before this migration have no `Pet` row and will 404 on `/pet`/`/progress` until Phase-3-or-later backfill, not done automatically here. Also fixed a pre-existing gap found while implementing: `GlobalExceptionHandler` had no handler for `HttpMessageNotReadableException`, so an invalid enum value in a JSON body (`Goal`, and now `ActivityType`) was falling through to `500 INTERNAL_ERROR` instead of the intended `400 VALIDATION_ERROR` — added the handler, no other behavior change. 22/22 tests passing, `V4` migration verified against the real Neon Postgres via the Spring context-load test. Trick unlock, energy-decay-over-time, and Leitner/spaced-repetition state remain out of scope per spec, deferred to Phase 3+. Merged to `main` (no PR, direct merge per user request); `feature/vocab-phase-2-progress-pet-xp` branch deleted after merge.
-</content>
+### Design options considered (see chat for full writeup)
+- **A — stateless refresh JWT (no DB)**: rejected — a long-lived token with no revocation path is a real security gap once refresh tokens live for weeks.
+- **B — opaque refresh token, persisted + hashed + rotated (chosen)**: matches "backend owns all of auth" from `project-overview.md`, gives real revoke/logout/theft-detection, pairs naturally with NextAuth's own encrypted session JWT as the vault on the FE side.
+- **C — backend sets refresh token as an HttpOnly cookie directly**: rejected for now — cross-origin cookie semantics between the Next.js app and the Spring Boot API (SameSite/Secure/CORS-credentials) add complexity that buys little once NextAuth is already the session vault sitting in front of the browser.

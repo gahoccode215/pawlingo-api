@@ -16,8 +16,8 @@ The backend owns **all business logic, the database, and auth**. Next.js only ca
 
 ## 2. Backend's role in the system
 
-- Owns **all data** — entities: User, Pet, VocabWord, Progress. The JPA entity classes + Flyway migrations in the codebase are the source of truth for exact fields/types, not this doc — the shape evolves as features land, so it isn't duplicated here to avoid drifting out of sync.
-- Owns **authentication**: Email/Password + Google OAuth, issues JWT/session. The FE does not manage credentials itself.
+- Owns **all data** — entities currently in the codebase: User, Pet. `Vocabulary` and `Progress` were removed (see §7) and will return once vocab is rebuilt after auth. The JPA entity classes + Flyway migrations in the codebase are the source of truth for exact fields/types, not this doc — the shape evolves as features land, so it isn't duplicated here to avoid drifting out of sync.
+- Owns **authentication**: Email/Password + Google OAuth (ID token verification), issues JWT. The FE does not manage credentials itself.
 - Exposes REST API for the FE (`pawlingo-ui`) consumed via `src/lib/api.ts`.
 - Owns business rules: XP calculation, pet energy decay over time, spaced repetition, etc.
 
@@ -35,9 +35,9 @@ Pin versions here as they're actually adopted, so this file stays the source of 
 | Database | PostgreSQL | 17 | Target — no server provisioned yet in dev |
 | ORM | Spring Data JPA / Hibernate ORM | 7.4.1.Final | In use |
 | Migration | Flyway | 12.4.0 (`flyway-core` + `flyway-database-postgresql`) | In use |
-| Auth (session) | Spring Security | 7.1.0 | In use (email/password only so far) |
+| Auth (session) | Spring Security | 7.1.0 | In use |
 | Auth (JWT) | jjwt | 0.12.6 | In use — Spring Security has no built-in JWT support |
-| Auth (OAuth) | `spring-boot-starter-oauth2-client` | — | Not added — Google OAuth out of scope for now |
+| Auth (OAuth) | `google-api-client` | 2.9.0 | In use — verifies Google ID tokens server-side (no `spring-boot-starter-oauth2-client`) |
 | Validation | Jakarta Bean Validation / Hibernate Validator | 9.1.0.Final | In use |
 | Object mapping | Lombok | 1.18.46 | In use |
 | Docs | springdoc-openapi (Swagger UI) | 3.1.0 | In use — UI at `/swagger-ui.html`, JSON at `/v3/api-docs` |
@@ -54,41 +54,49 @@ Next.js (pawlingo-ui)  --HTTP/JSON-->  Spring Boot (pawlingo-api)  --JPA-->  Pos
 
 - Layered architecture in the backend: `Controller → Service → Repository → Entity`.
 - A unified response envelope `{ success, data, error }` so it matches how the FE handles errors in `src/lib/api.ts`. The Java type is `ApiResponseDTO<T>` (`common/response`) — named `...DTO` specifically to avoid a class-name clash with springdoc-openapi's own response types once Swagger is added.
-- Top level is package-by-feature (`auth`, `user`, `pet`, `vocab`, `progress`, plus `common` for cross-cutting concerns). **Within** each feature package, organize by layer: `controller/`, `service/` (interface) + `service/impl/` (`*ServiceImpl`), `repository/`, `dto/request/`, `dto/response/` — e.g. `auth/service/AuthService` (interface) + `auth/service/impl/AuthServiceImpl`. Controllers/other services depend on the interface, never the impl directly. A narrow single-caller technical utility (e.g. `auth/service/JwtService`) can stay a concrete class without an interface — the split is for business services consumed elsewhere via their interface. Full layout and naming rules: `coding-standards.md` §1–2.
+- Top level is package-by-feature (`auth`, `user`, `pet`, plus `common` for cross-cutting concerns — `vocab`/`progress` removed for now, see §7). **Within** each feature package, organize by layer: `controller/`, `service/` (interface) + `service/impl/` (`*ServiceImpl`), `repository/`, `dto/request/`, `dto/response/` — e.g. `auth/service/AuthService` (interface) + `auth/service/impl/AuthServiceImpl`. Controllers/other services depend on the interface, never the impl directly. A narrow single-caller technical utility (e.g. `auth/service/JwtService`) can stay a concrete class without an interface — the split is for business services consumed elsewhere via their interface. Full layout and naming rules: `coding-standards.md` §1–2.
 - Exceptions: domain/business errors all throw one `BusinessException(ErrorCode)` (`common/exception`) rather than a class per error type — `ErrorCode` is an enum pairing each case with an `HttpStatus` and default message, so adding a new business error is a new enum constant, not a new file. `GlobalExceptionHandler` has a single handler for `BusinessException` plus separate handlers for validation errors and unexpected exceptions. Details: `coding-standards.md` §6.
 - Auth: stateless JWT via Spring Security (`common/security/JwtAuthenticationFilter` + `JwtAuthenticationEntryPoint`, `auth/service/JwtService`). The entry point returns 401 through the same `ApiResponseDTO` envelope rather than Spring Security's default plain-text 401.
 
 ---
 
-## 5. API contract (initial direction — to be refined)
+## 5. API contract
 
 - Base path: `/api/v1`
-- Auth: JWT (access token, plus refresh token if needed); FE stores it via httpOnly cookie or a session bridge.
+- Auth: JWT access token (`Authorization: Bearer <token>`); no refresh token yet.
 - Response envelope: `{ success: boolean, data: T | null, error: { code, message } | null }`
-
-Priority endpoints for MVP:
+- Three sources, three jobs — don't re-derive one from another by hand:
+  - **This table** — current state of every endpoint. Read this to see what exists *right now*.
+  - **`docs/api-changelog.md`** — history of what changed *and why*, one dated entry per completed feature (auto-populated by `/feature complete`). Read this to catch up after time away, without reading git log or code.
+  - **Live OpenAPI spec** (`/v3/api-docs`, Swagger UI at `/swagger-ui.html`) — exact current field-level shapes, generated from code so it can't drift. Point `openapi-typescript` (or similar) at it to generate FE types instead of hand-reading DTOs/Java.
 
 | Method | Path | Status | Description |
 |---|---|---|---|
 | POST | `/auth/register` | **Implemented** | Register with email/password, returns JWT |
 | POST | `/auth/login` | **Implemented** | Login with email/password, returns JWT |
-| GET | `/auth/me` | **Implemented** | Current authenticated user (requires `Authorization: Bearer`) |
-| GET/POST | `/auth/google` | Planned | Google OAuth login/callback |
-| GET | `/pet` | Planned | Get the current user's pet |
-| GET | `/vocab/topics/{topic}` | Planned | Get vocabulary words for a topic |
-| POST | `/progress` | Planned | Record a learning result (correct/wrong) |
+| POST | `/auth/google` | **Implemented** | Login or register via a Google ID token, returns JWT |
+| GET | `/auth/me` | **Implemented** | Current authenticated user |
+| GET | `/pet` | **Implemented** | Current user's pet |
+| GET | `/users` | **Implemented (debug-only)** | List all users, no pagination — see security note below |
 
-Auth is public on `register`/`login` only; every other endpoint requires a valid JWT by default (`common/config/SecurityConfig`).
+`/vocabularies`, `/vocabularies/{id}`, and `/progress` existed on `main` but were removed (see §7) — they'll reappear here once vocab is rebuilt.
+
+Auth is public on `register`/`login`/`google` only; every other endpoint requires a valid JWT by default (`common/config/SecurityConfig`).
+
+**⚠ Security note:** `GET /users` is currently in `SecurityConfig`'s whitelist and requires no auth at all, exposing every user's email. It was whitelisted for local debugging during Google OAuth testing and was never meant to stay that way — it needs to be removed from the whitelist (or gated behind an admin role) before this goes anywhere beyond local dev.
 
 ---
 
 ## 6. Roadmap (backend portion)
 
-**MVP (after the FE validation phase):**
-- Stand up the Spring Boot backend: auth (email/password + Google OAuth) + database.
-- Entities + migrations for User, Pet, VocabWord, Progress.
-- API for FE integration via `src/lib/api.ts`.
-- Multiple vocab topics, basic spaced repetition logic.
+**MVP — done:**
+- Auth: email/password + Google OAuth, JWT issuance.
+- Entities + migrations for User, Pet.
+
+**MVP — in progress / next:**
+- Auth: access + refresh tokens (rotating, revocable) — see `current-feature.md`.
+- Vocabulary content + Progress/pet XP — previously implemented, then removed on `feature/vocabulary-content-refactor` to reset the data model; will be rebuilt from scratch after auth is done (see §7).
+- Spaced repetition logic.
 - Daily reminders (push/email) — could be a scheduled job or an external service integration.
 
 **Phase 2:**
@@ -103,8 +111,11 @@ Auth is public on `register`/`login` only; every other endpoint requires a valid
 
 ## 7. Current status
 
-- Backend: `auth` module (email/password) implemented on branch `feature/authentication-email-password-mvp` — see the API contract table in §5 and the architecture notes in §4. `user`/`pet`/`vocab`/`progress` modules not started beyond the `User` entity.
-- Git: `pawlingo-api` had no repo until this feature; initialized locally with a baseline commit on `main` before branching. Not yet pushed to a remote.
-- Local dev needs a Postgres connection (`DB_URL`/`DB_USERNAME`/`DB_PASSWORD` env vars) and `JWT_SECRET` set — no Docker/Testcontainers wired up yet, so the full-context Spring Boot test needs a real local Postgres to pass.
-- FE (`pawlingo-ui`): in the validation MVP phase (landing page + static demo, not yet calling the backend).
+- Backend: auth (email/password + Google OAuth) is implemented. See the API contract table in §5.
+- **Vocab and Progress were removed** (both the original `Topic`/`VocabWord`/`Progress` implementation and the in-progress consolidation into a single `Vocabulary` entity on `feature/vocabulary-content-refactor`) — the `vocab/` and `progress/` packages, their tests, and their migrations (`topics`/`vocab_words`/`progress` tables) are gone from the codebase. Decision: finish auth first, then rebuild vocab (and progress) cleanly from scratch rather than carry the half-finished refactor forward. Flyway migrations were squashed down to `V1__create_users_table.sql` (users, with Google OAuth columns included from the start) + `V2__create_pets_table.sql` (pets only) — safe to do since no real Postgres has ever run these migrations yet (see below).
+- Current focus: complete auth (access + refresh tokens — see `current-feature.md`), then rebuild vocabulary learning.
+- **Testing policy (current):** implement features without writing tests by default; tests are written only when explicitly requested for a specific, already-implemented feature — don't write them proactively per feature.
+- Local dev env vars: `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` (Postgres), `JWT_SECRET`, `GOOGLE_CLIENT_ID` (Google OAuth). No Docker/Testcontainers wired up yet, so tests that need a full Spring context require a real local Postgres.
+- Git: not yet pushed to a remote.
+- FE (`pawlingo-ui`) status isn't tracked in this doc — check that repo directly.
 - Next step for backend: see `current-feature.md`.

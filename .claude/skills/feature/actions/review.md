@@ -14,5 +14,5 @@
    - Schema changes have a corresponding Flyway migration, and the migration matches the entity
    - Endpoints requiring auth are actually protected in `SecurityConfig`
    - No hardcoded secrets or credentials introduced
-   - Relevant tests exist and `mvn test` (or `./mvnw test`) passes
+   - Tests are **not** required by default for this pass — current policy is implement-first, tests only when explicitly requested for a specific feature. Don't flag missing tests as a review issue unless the user asked for tests on this feature. If tests already exist (requested earlier, or pre-existing), they should still pass (`./mvnw test`).
 5. Final verdict: Ready to complete or needs changes
