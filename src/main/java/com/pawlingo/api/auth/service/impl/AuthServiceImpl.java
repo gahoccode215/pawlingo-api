@@ -2,15 +2,21 @@ package com.pawlingo.api.auth.service.impl;
 
 import com.pawlingo.api.auth.dto.request.GoogleAuthRequest;
 import com.pawlingo.api.auth.dto.request.LoginRequest;
+import com.pawlingo.api.auth.dto.request.LogoutRequest;
+import com.pawlingo.api.auth.dto.request.RefreshRequest;
 import com.pawlingo.api.auth.dto.request.RegisterRequest;
 import com.pawlingo.api.auth.dto.response.GoogleAuthResponse;
 import com.pawlingo.api.auth.dto.response.LoginResponse;
 import com.pawlingo.api.auth.dto.response.MeResponse;
+import com.pawlingo.api.auth.dto.response.RefreshResponse;
 import com.pawlingo.api.auth.dto.response.RegisterResponse;
 import com.pawlingo.api.auth.service.AuthService;
 import com.pawlingo.api.auth.service.GoogleTokenVerifier;
 import com.pawlingo.api.auth.service.GoogleUserInfo;
 import com.pawlingo.api.auth.service.JwtService;
+import com.pawlingo.api.auth.service.RefreshTokenIssuance;
+import com.pawlingo.api.auth.service.RefreshTokenService;
+import com.pawlingo.api.auth.service.RotatedRefreshToken;
 import com.pawlingo.api.common.exception.BusinessException;
 import com.pawlingo.api.common.exception.ErrorCode;
 import com.pawlingo.api.pet.service.PetService;
@@ -31,6 +37,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
     private final GoogleTokenVerifier googleTokenVerifier;
     private final PetService petService;
 
@@ -38,11 +45,13 @@ public class AuthServiceImpl implements AuthService {
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
+            RefreshTokenService refreshTokenService,
             GoogleTokenVerifier googleTokenVerifier,
             PetService petService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
         this.googleTokenVerifier = googleTokenVerifier;
         this.petService = petService;
     }
@@ -65,7 +74,14 @@ public class AuthServiceImpl implements AuthService {
         petService.createDefaultPet(user.getId());
 
         String accessToken = jwtService.generateToken(user.getId(), user.getEmail());
-        return new RegisterResponse(user.getId(), user.getEmail(), user.getGoal(), accessToken);
+        RefreshTokenIssuance refreshToken = refreshTokenService.issue(user.getId());
+        return new RegisterResponse(
+                user.getId(),
+                user.getEmail(),
+                user.getGoal(),
+                accessToken,
+                refreshToken.token(),
+                jwtService.getExpirationSeconds());
     }
 
     @Override
@@ -79,7 +95,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         String accessToken = jwtService.generateToken(user.getId(), user.getEmail());
-        return new LoginResponse(accessToken, jwtService.getExpirationSeconds());
+        RefreshTokenIssuance refreshToken = refreshTokenService.issue(user.getId());
+        return new LoginResponse(accessToken, refreshToken.token(), jwtService.getExpirationSeconds());
     }
 
     @Override
@@ -121,14 +138,39 @@ public class AuthServiceImpl implements AuthService {
 
     private GoogleAuthResponse issueGoogleAuthResponse(User user, boolean isNewUser) {
         String accessToken = jwtService.generateToken(user.getId(), user.getEmail());
+        RefreshTokenIssuance refreshToken = refreshTokenService.issue(user.getId());
         return new GoogleAuthResponse(
-                user.getId(), user.getEmail(), user.getGoal(), accessToken, jwtService.getExpirationSeconds(), isNewUser);
+                user.getId(),
+                user.getEmail(),
+                user.getGoal(),
+                accessToken,
+                refreshToken.token(),
+                jwtService.getExpirationSeconds(),
+                isNewUser);
     }
 
     @Override
     public MeResponse me(UUID userId) {
         User user = userRepository.findById(userId).orElseThrow(NoSuchElementException::new);
         return new MeResponse(user.getId(), user.getEmail(), user.getGoal());
+    }
+
+    @Override
+    @Transactional
+    public RefreshResponse refresh(RefreshRequest request) {
+        RotatedRefreshToken rotated = refreshTokenService.rotate(request.refreshToken());
+        User user = userRepository
+                .findById(rotated.userId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REFRESH_TOKEN));
+
+        String accessToken = jwtService.generateToken(user.getId(), user.getEmail());
+        return new RefreshResponse(
+                accessToken, rotated.issuance().token(), jwtService.getExpirationSeconds());
+    }
+
+    @Override
+    public void logout(LogoutRequest request) {
+        refreshTokenService.revoke(request.refreshToken());
     }
 
     private String normalizeEmail(String email) {

@@ -2,10 +2,13 @@ package com.pawlingo.api.auth.controller;
 
 import com.pawlingo.api.auth.dto.request.GoogleAuthRequest;
 import com.pawlingo.api.auth.dto.request.LoginRequest;
+import com.pawlingo.api.auth.dto.request.LogoutRequest;
+import com.pawlingo.api.auth.dto.request.RefreshRequest;
 import com.pawlingo.api.auth.dto.request.RegisterRequest;
 import com.pawlingo.api.auth.dto.response.GoogleAuthResponse;
 import com.pawlingo.api.auth.dto.response.LoginResponse;
 import com.pawlingo.api.auth.dto.response.MeResponse;
+import com.pawlingo.api.auth.dto.response.RefreshResponse;
 import com.pawlingo.api.auth.dto.response.RegisterResponse;
 import com.pawlingo.api.auth.service.AuthService;
 import com.pawlingo.api.common.response.ApiResponseDTO;
@@ -63,5 +66,19 @@ public class AuthController {
     public ResponseEntity<ApiResponseDTO<MeResponse>> me(@AuthenticationPrincipal User currentUser) {
         MeResponse response = authService.me(currentUser.getId());
         return ResponseEntity.ok(ApiResponseDTO.ok(response));
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Exchange a refresh token for a new access + refresh token pair (rotates)")
+    public ResponseEntity<ApiResponseDTO<RefreshResponse>> refresh(@Valid @RequestBody RefreshRequest request) {
+        RefreshResponse response = authService.refresh(request);
+        return ResponseEntity.ok(ApiResponseDTO.ok(response));
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Revoke a refresh token, logging out that session")
+    public ResponseEntity<ApiResponseDTO<Void>> logout(@Valid @RequestBody LogoutRequest request) {
+        authService.logout(request);
+        return ResponseEntity.ok(ApiResponseDTO.ok(null));
     }
 }

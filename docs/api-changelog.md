@@ -34,6 +34,41 @@ Only frontend-relevant API changes should be recorded here.
 
 ---
 
+## 2026-08-23 — Auth: access + refresh tokens
+
+#### Changed
+
+- `POST /api/v1/auth/register`
+  - What changed: response now also includes `refreshToken` and `expiresIn` (`expiresIn` was missing entirely before).
+  - Frontend impact: store the refresh token (server-side only, e.g. inside NextAuth's encrypted session JWT) and use it to renew the session instead of forcing re-login.
+  - Migration required: Yes.
+- `POST /api/v1/auth/login`
+  - What changed: response now also includes `refreshToken`.
+  - Frontend impact: same as above.
+  - Migration required: Yes.
+- `POST /api/v1/auth/google`
+  - What changed: response now also includes `refreshToken`.
+  - Frontend impact: same as above.
+  - Migration required: Yes.
+
+#### Added
+
+- `POST /api/v1/auth/refresh`
+  - Description: exchange a refresh token for a new access + refresh token pair. Rotates on every call — the presented refresh token is invalidated and a new one issued.
+  - Frontend impact: call this when the access token expires instead of forcing the user to log in again.
+- `POST /api/v1/auth/logout`
+  - Description: revokes a single refresh token. Public endpoint — works even if the access token has already expired.
+  - Frontend impact: call this on sign-out (before clearing local/session state) so the session is actually revoked server-side, not just abandoned client-side.
+
+#### Security
+
+- Access token lifetime shortened from 24h to 15 min (`JWT_EXPIRATION_SECONDS`, still env-overridable) now that refresh covers session continuity.
+- New refresh token: opaque (not a JWT), 30-day default lifetime (`JWT_REFRESH_EXPIRATION_SECONDS`), stored server-side only as a SHA-256 hash, rotated on every `/auth/refresh` call.
+- Reusing an already-rotated (previously-used) refresh token is treated as theft/replay and revokes **every** active refresh token for that user — expect a forced re-login on all devices if this triggers unexpectedly (e.g. a client retrying a stale token after a successful rotation already happened).
+- New error code `INVALID_REFRESH_TOKEN` (401) — deliberately generic across not-found/expired/revoked/reused, so a client can't distinguish the failure reason from the response.
+
+---
+
 ## 2026-08-23 — Remove vocab & progress (reset before rebuild)
 
 #### Removed

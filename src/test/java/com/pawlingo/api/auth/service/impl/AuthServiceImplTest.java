@@ -18,6 +18,8 @@ import com.pawlingo.api.auth.dto.response.RegisterResponse;
 import com.pawlingo.api.auth.service.GoogleTokenVerifier;
 import com.pawlingo.api.auth.service.GoogleUserInfo;
 import com.pawlingo.api.auth.service.JwtService;
+import com.pawlingo.api.auth.service.RefreshTokenIssuance;
+import com.pawlingo.api.auth.service.RefreshTokenService;
 import com.pawlingo.api.common.exception.BusinessException;
 import com.pawlingo.api.common.exception.ErrorCode;
 import com.pawlingo.api.pet.service.PetService;
@@ -47,6 +49,9 @@ class AuthServiceImplTest {
     private JwtService jwtService;
 
     @Mock
+    private RefreshTokenService refreshTokenService;
+
+    @Mock
     private GoogleTokenVerifier googleTokenVerifier;
 
     @Mock
@@ -56,7 +61,8 @@ class AuthServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        authService = new AuthServiceImpl(userRepository, passwordEncoder, jwtService, googleTokenVerifier, petService);
+        authService = new AuthServiceImpl(
+                userRepository, passwordEncoder, jwtService, refreshTokenService, googleTokenVerifier, petService);
     }
 
     @Test
@@ -70,12 +76,14 @@ class AuthServiceImplTest {
             return user;
         });
         when(jwtService.generateToken(any(UUID.class), anyString())).thenReturn("jwt-token");
+        when(refreshTokenService.issue(any(UUID.class))).thenReturn(new RefreshTokenIssuance("refresh-token", 2592000L));
 
         RegisterResponse response = authService.register(request);
 
         assertThat(response.email()).isEqualTo("user@example.com");
         assertThat(response.goal()).isEqualTo(Goal.BEGINNER);
         assertThat(response.accessToken()).isEqualTo("jwt-token");
+        assertThat(response.refreshToken()).isEqualTo("refresh-token");
         verify(userRepository).save(any(User.class));
     }
 
@@ -104,10 +112,12 @@ class AuthServiceImplTest {
         when(passwordEncoder.matches("password123", "hashed")).thenReturn(true);
         when(jwtService.generateToken(user.getId(), user.getEmail())).thenReturn("jwt-token");
         when(jwtService.getExpirationSeconds()).thenReturn(86400L);
+        when(refreshTokenService.issue(user.getId())).thenReturn(new RefreshTokenIssuance("refresh-token", 2592000L));
 
         LoginResponse response = authService.login(request);
 
         assertThat(response.accessToken()).isEqualTo("jwt-token");
+        assertThat(response.refreshToken()).isEqualTo("refresh-token");
         assertThat(response.expiresIn()).isEqualTo(86400L);
     }
 
@@ -155,12 +165,14 @@ class AuthServiceImplTest {
         });
         when(jwtService.generateToken(any(UUID.class), anyString())).thenReturn("jwt-token");
         when(jwtService.getExpirationSeconds()).thenReturn(86400L);
+        when(refreshTokenService.issue(any(UUID.class))).thenReturn(new RefreshTokenIssuance("refresh-token", 2592000L));
 
         GoogleAuthResponse response = authService.loginWithGoogle(request);
 
         assertThat(response.email()).isEqualTo("user@example.com");
         assertThat(response.goal()).isEqualTo(Goal.BEGINNER);
         assertThat(response.accessToken()).isEqualTo("jwt-token");
+        assertThat(response.refreshToken()).isEqualTo("refresh-token");
         assertThat(response.isNewUser()).isTrue();
         verify(userRepository)
                 .save(argThat(u -> u.getAuthProvider() == AuthProvider.GOOGLE
@@ -183,6 +195,8 @@ class AuthServiceImplTest {
         when(userRepository.findByGoogleId("google-sub-1")).thenReturn(Optional.of(existing));
         when(jwtService.generateToken(existing.getId(), existing.getEmail())).thenReturn("jwt-token");
         when(jwtService.getExpirationSeconds()).thenReturn(86400L);
+        when(refreshTokenService.issue(existing.getId()))
+                .thenReturn(new RefreshTokenIssuance("refresh-token", 2592000L));
 
         GoogleAuthResponse response = authService.loginWithGoogle(request);
 
@@ -235,6 +249,7 @@ class AuthServiceImplTest {
             return user;
         });
         when(jwtService.generateToken(any(UUID.class), anyString())).thenReturn("jwt-token");
+        when(refreshTokenService.issue(any(UUID.class))).thenReturn(new RefreshTokenIssuance("refresh-token", 2592000L));
 
         RegisterResponse response = authService.register(request);
 

@@ -11,6 +11,7 @@ public enum ErrorCode {
     GOOGLE_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "Invalid Google ID token"),
     GOOGLE_EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "Google account email is not verified"),
     ACCOUNT_EXISTS_WITH_PASSWORD(HttpStatus.CONFLICT, "An account with this email already exists, log in with your password"),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token"),
     PET_NOT_FOUND(HttpStatus.NOT_FOUND, "Pet not found for this user");
 
     private final HttpStatus status;

@@ -2,10 +2,13 @@ package com.pawlingo.api.auth.service;
 
 import com.pawlingo.api.auth.dto.request.GoogleAuthRequest;
 import com.pawlingo.api.auth.dto.request.LoginRequest;
+import com.pawlingo.api.auth.dto.request.LogoutRequest;
+import com.pawlingo.api.auth.dto.request.RefreshRequest;
 import com.pawlingo.api.auth.dto.request.RegisterRequest;
 import com.pawlingo.api.auth.dto.response.GoogleAuthResponse;
 import com.pawlingo.api.auth.dto.response.LoginResponse;
 import com.pawlingo.api.auth.dto.response.MeResponse;
+import com.pawlingo.api.auth.dto.response.RefreshResponse;
 import com.pawlingo.api.auth.dto.response.RegisterResponse;
 import java.util.UUID;
 
@@ -18,4 +21,8 @@ public interface AuthService {
     GoogleAuthResponse loginWithGoogle(GoogleAuthRequest request);
 
     MeResponse me(UUID userId);
+
+    RefreshResponse refresh(RefreshRequest request);
+
+    void logout(LogoutRequest request);
 }
