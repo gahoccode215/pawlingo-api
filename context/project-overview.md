@@ -32,7 +32,7 @@ Pin versions here as they're actually adopted, so this file stays the source of 
 | Language | Java | 21 (LTS) | In use |
 | Framework | Spring Boot | 4.1.0 | In use |
 | Build | Maven | 3.9.16 (via `mvnw`) | In use |
-| Database | PostgreSQL | 17 | Target — no server provisioned yet in dev |
+| Database | PostgreSQL | 17 | In use — Neon-hosted Postgres, connection in `.env` (`DB_URL`/`DB_USERNAME`/`DB_PASSWORD`) |
 | ORM | Spring Data JPA / Hibernate ORM | 7.4.1.Final | In use |
 | Migration | Flyway | 12.4.0 (`flyway-core` + `flyway-database-postgresql`) | In use |
 | Auth (session) | Spring Security | 7.1.0 | In use |
@@ -113,10 +113,11 @@ Auth is public on `register`/`login`/`google`/`refresh`/`logout` only; every oth
 ## 7. Current status
 
 - Backend: auth (email/password + Google OAuth, JWT access + rotating refresh tokens) is implemented and complete. See the API contract table in §5.
-- **Vocab and Progress were removed** (both the original `Topic`/`VocabWord`/`Progress` implementation and the in-progress consolidation into a single `Vocabulary` entity on `feature/vocabulary-content-refactor`) — the `vocab/` and `progress/` packages, their tests, and their migrations (`topics`/`vocab_words`/`progress` tables) are gone from the codebase. Decision: finish auth first, then rebuild vocab (and progress) cleanly from scratch rather than carry the half-finished refactor forward. Flyway migrations were squashed down to `V1__create_users_table.sql` (users, with Google OAuth columns included from the start) + `V2__create_pets_table.sql` (pets only), with `V3__create_refresh_tokens_table.sql` added for the refresh-token feature — safe to squash since no real Postgres has ever run these migrations yet (see below).
+- **Vocab and Progress were removed** (both the original `Topic`/`VocabWord`/`Progress` implementation and the in-progress consolidation into a single `Vocabulary` entity on `feature/vocabulary-content-refactor`) — the `vocab/` and `progress/` packages, their tests, and their migrations (`topics`/`vocab_words`/`progress` tables) are gone from the codebase. Decision: finish auth first, then rebuild vocab (and progress) cleanly from scratch rather than carry the half-finished refactor forward. Flyway migrations are `V1__create_users_table.sql` (users, with Google OAuth columns included from the start), `V2__create_pets_table.sql` (pets only), `V3__create_refresh_tokens_table.sql` (refresh-token feature).
+- **The dev Postgres (Neon) is a real, shared database with its own migration history** — it is not a scratch/empty DB per environment. Its schema was reset once (2026-08-23) to match the squashed V1–V3 above, after an earlier squash attempt collided with migrations that had already been applied there (including one migration that was run directly against this DB and never committed to git, so its exact original SQL is permanently lost). Lesson: never rewrite a migration file without first checking `flyway_schema_history` on this DB — `git log`/local file state alone doesn't tell you what's actually been applied.
 - Current focus: rebuild vocabulary learning (content + progress/pet XP) now that auth is done.
 - **Testing policy (current):** implement features without writing tests by default; tests are written only when explicitly requested for a specific, already-implemented feature — don't write them proactively per feature.
-- Local dev env vars: `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` (Postgres), `JWT_SECRET`, `GOOGLE_CLIENT_ID` (Google OAuth). No Docker/Testcontainers wired up yet, so tests that need a full Spring context require a real local Postgres.
-- Git: not yet pushed to a remote.
+- Local dev env vars: `DB_URL`/`DB_USERNAME`/`DB_PASSWORD` (Neon Postgres), `JWT_SECRET`, `JWT_EXPIRATION_SECONDS`/`JWT_REFRESH_EXPIRATION_SECONDS`, `GOOGLE_CLIENT_ID` — see `.env.example`. No Testcontainers wired up (tests needing a full Spring context, e.g. `PawlingoApiApplicationTests`, run against the real Neon dev DB instead).
+- Git: pushed to `origin` (`https://github.com/gahoccode215/pawlingo-api.git`).
 - FE (`pawlingo-ui`) status isn't tracked in this doc — check that repo directly.
 - Next step for backend: see `current-feature.md`.
