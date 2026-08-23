@@ -34,6 +34,35 @@ Only frontend-relevant API changes should be recorded here.
 
 ---
 
+## 2026-08-24 — Vocabulary Foundation
+
+#### Added
+
+- `GET /api/v1/vocabularies`
+  - Description: Browse/search/filter vocabulary words, paginated. Query params: `q` (case-insensitive prefix search on the word, min 2 chars, 400 if shorter), `difficultyLevel`, `partOfSpeech` (both combinable with each other and with `q`), `page`, `size` (default 20, clamped to 100 — no error above 100), `sort` (default `word,asc`; also accepts `difficultyLevel`/`createdAt`). Public — no auth required.
+  - Frontend impact: paginated response now carries a `meta` object alongside `data`: `{ page, size, totalElements, totalPages }` (see Changed below for the envelope shape).
+- `GET /api/v1/vocabularies/{id}`
+  - Description: Full word detail — phonetic, difficulty, part of speech, meaning, and ordered `examples[]`. Public. `404 WORD_NOT_FOUND` if not found, `400 VALIDATION_ERROR` if `id` isn't a valid UUID.
+- `POST /api/v1/users/me/vocabularies`
+  - Description: Save a word to the current user's vocabulary. Body `{ wordId }`. Idempotent — `200` with the existing entry if already saved, `201` if newly created. `404 WORD_NOT_FOUND` if `wordId` doesn't exist, `400 VALIDATION_ERROR` if missing/malformed. Requires Bearer token.
+- `DELETE /api/v1/users/me/vocabularies/{wordId}`
+  - Description: Remove a word from the current user's vocabulary (hard delete). `204` on success, `404 VOCABULARY_NOT_FOUND` if not saved. Requires Bearer token.
+- `PATCH /api/v1/users/me/vocabularies/{wordId}/favorite`
+  - Description: Favorite/unfavorite a word. Body `{ isFavorite }`. Favoriting a word not yet saved implicitly creates the saved entry (status `NEW`); unfavoriting does not delete it. `404 WORD_NOT_FOUND` if the word doesn't exist. Requires Bearer token.
+- `GET /api/v1/users/me/vocabularies`
+  - Description: List the current user's saved words, paginated, filterable by `isFavorite`/`status`; each entry includes a nested `word` summary. Requires Bearer token.
+
+#### Changed
+
+- Response envelope `ApiResponseDTO<T>` gained a 4th field, `meta`: `{ success, data, error, meta }`. `meta` is `null` for every existing/non-paginated endpoint and only populated (`{ page, size, totalElements, totalPages }`) by the two paginated endpoints above — no impact on any other endpoint's response shape.
+
+#### Security
+
+- New error codes: `WORD_NOT_FOUND` (404), `VOCABULARY_NOT_FOUND` (404).
+- `/vocabularies` and `/vocabularies/{id}` are intentionally public — shared, non-sensitive content, not an oversight. All `/users/me/vocabularies*` endpoints require a valid Bearer access token like other authenticated endpoints.
+
+---
+
 ## 2026-08-24 — Remove pet (to redesign); expose profile fields on /auth/me
 
 #### Changed
