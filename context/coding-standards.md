@@ -6,7 +6,7 @@ Applies to all code in this Spring Boot repo (Java 21 / Spring Boot 4.1.0).
 
 ## 1. Package structure
 
-Top level is organized by **feature (package-by-feature)** — auth, user, pet, vocab, progress... — so it scales cleanly as modules are added. **Within** each feature package, organize by layer:
+Top level is organized by **feature (package-by-feature)** — auth, user, vocab, progress... — so it scales cleanly as modules are added. **Within** each feature package, organize by layer:
 
 ```
 com.pawlingo.api
@@ -29,7 +29,6 @@ com.pawlingo.api
 │   │   └── AuthProvider.java
 │   └── repository/
 │       └── UserRepository.java
-├── pet
 ├── vocab
 ├── progress
 ├── common
@@ -51,10 +50,10 @@ com.pawlingo.api
 
 ## 2. Naming conventions
 
-- Classes: `PascalCase`. Entities are singular (`User`, `Pet`, not `Users`).
+- Classes: `PascalCase`. Entities are singular (`User`, not `Users`).
 - Methods/fields/variables: `camelCase`.
 - Constants: `UPPER_SNAKE_CASE`.
-- Request DTOs: `XxxRequest` (e.g. `RegisterRequest`). Response DTOs: `XxxResponse` (e.g. `PetResponse`).
+- Request DTOs: `XxxRequest` (e.g. `RegisterRequest`). Response DTOs: `XxxResponse` (e.g. `LoginResponse`).
 - REST endpoints: plural nouns, lowercase/kebab-case, versioned: `/api/v1/vocab-topics`.
 - DB tables: `snake_case`, plural (`users`, `vocab_words`).
 

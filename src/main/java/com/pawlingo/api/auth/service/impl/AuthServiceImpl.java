@@ -19,7 +19,6 @@ import com.pawlingo.api.auth.service.RefreshTokenService;
 import com.pawlingo.api.auth.service.RotatedRefreshToken;
 import com.pawlingo.api.common.exception.BusinessException;
 import com.pawlingo.api.common.exception.ErrorCode;
-import com.pawlingo.api.pet.service.PetService;
 import com.pawlingo.api.user.entity.User;
 import com.pawlingo.api.user.enums.AuthProvider;
 import com.pawlingo.api.user.enums.Goal;
@@ -39,21 +38,18 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final GoogleTokenVerifier googleTokenVerifier;
-    private final PetService petService;
 
     public AuthServiceImpl(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             RefreshTokenService refreshTokenService,
-            GoogleTokenVerifier googleTokenVerifier,
-            PetService petService) {
+            GoogleTokenVerifier googleTokenVerifier) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.googleTokenVerifier = googleTokenVerifier;
-        this.petService = petService;
     }
 
     @Override
@@ -71,7 +67,6 @@ public class AuthServiceImpl implements AuthService {
                 .authProvider(AuthProvider.LOCAL)
                 .build();
         user = userRepository.save(user);
-        petService.createDefaultPet(user.getId());
 
         String accessToken = jwtService.generateToken(user.getId(), user.getEmail());
         RefreshTokenIssuance refreshToken = refreshTokenService.issue(user.getId());
@@ -132,7 +127,6 @@ public class AuthServiceImpl implements AuthService {
                 .googleId(googleUserInfo.googleId())
                 .build();
         User savedUser = userRepository.save(newUser);
-        petService.createDefaultPet(savedUser.getId());
         return issueGoogleAuthResponse(savedUser, true);
     }
 
@@ -152,7 +146,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public MeResponse me(UUID userId) {
         User user = userRepository.findById(userId).orElseThrow(NoSuchElementException::new);
-        return new MeResponse(user.getId(), user.getEmail(), user.getGoal());
+        return new MeResponse(
+                user.getId(), user.getEmail(), user.getGoal(), user.getAuthProvider(), user.getCreatedAt());
     }
 
     @Override

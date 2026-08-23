@@ -34,6 +34,23 @@ Only frontend-relevant API changes should be recorded here.
 
 ---
 
+## 2026-08-24 — Remove pet (to redesign); expose profile fields on /auth/me
+
+#### Changed
+
+- `GET /api/v1/auth/me`
+  - What changed: response now also includes `authProvider` and `createdAt` (previously only `id`, `email`, `goal`), so the FE can render a basic profile page after login (e.g. hide "change password" for Google accounts, show "member since").
+  - Frontend impact: additive fields only, existing consumers unaffected.
+  - Migration required: No.
+
+#### Removed
+
+- `GET /api/v1/pet`
+  - Reason: pet feature is being redesigned from scratch with a new approach; old implementation (`pet/` package, `PetService`, `pets` table) removed entirely.
+  - Frontend migration: temporarily unavailable; do not call. Will return with a different shape once redesigned.
+
+---
+
 ## 2026-08-23 — Auth: access + refresh tokens
 
 #### Changed
@@ -80,7 +97,7 @@ Only frontend-relevant API changes should be recorded here.
   - Reason: same as above.
   - Frontend migration: temporarily unavailable.
 - `POST /api/v1/progress`
-  - Reason: depended on the vocab data model above; removed alongside it. Pet XP/energy update logic (`PetService.applyProgressResult`) stays in the codebase and will be reused once progress is rebuilt.
+  - Reason: depended on the vocab data model above; removed alongside it.
   - Frontend migration: temporarily unavailable.
 
 ---

@@ -22,7 +22,6 @@ import com.pawlingo.api.auth.service.RefreshTokenIssuance;
 import com.pawlingo.api.auth.service.RefreshTokenService;
 import com.pawlingo.api.common.exception.BusinessException;
 import com.pawlingo.api.common.exception.ErrorCode;
-import com.pawlingo.api.pet.service.PetService;
 import com.pawlingo.api.user.entity.User;
 import com.pawlingo.api.user.enums.AuthProvider;
 import com.pawlingo.api.user.enums.Goal;
@@ -54,15 +53,12 @@ class AuthServiceImplTest {
     @Mock
     private GoogleTokenVerifier googleTokenVerifier;
 
-    @Mock
-    private PetService petService;
-
     private AuthServiceImpl authService;
 
     @BeforeEach
     void setUp() {
         authService = new AuthServiceImpl(
-                userRepository, passwordEncoder, jwtService, refreshTokenService, googleTokenVerifier, petService);
+                userRepository, passwordEncoder, jwtService, refreshTokenService, googleTokenVerifier);
     }
 
     @Test
